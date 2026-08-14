@@ -1,0 +1,113 @@
+.editorconfig
+  s_c993aafaa497e8::t_8d2c36a09124c3 1-11
+.gitignore
+  s_c993aafaa497e8::t_5062ba62fa7207 1-25
+.nvmrc
+  s_c993aafaa497e8::t_33035507138c49 1
+.prettierignore
+  s_c993aafaa497e8::t_f0d496836aa222 1-10
+.prettierrc.json
+  s_c993aafaa497e8::t_3b1e5879b567ee 1-6
+.tool-versions
+  s_c993aafaa497e8::t_d66114ca7b865f 1-2
+apps/api/README.md
+  s_c993aafaa497e8::t_2a15e21df49242 1-27
+apps/api/api/index.ts
+  s_c993aafaa497e8::t_e79b470f85fc0b 1-12
+apps/api/cypress.config.ts
+  s_c993aafaa497e8::t_99b859d7b4ff0c 1-10
+apps/api/cypress/e2e/health.cy.ts
+  s_c993aafaa497e8::t_ba529cfaef8df3 1-9
+apps/api/eslint.architecture.config.mjs
+  s_c993aafaa497e8::t_4f8dd25707b8b8 1-29
+apps/api/eslint.config.mjs
+  s_c993aafaa497e8::t_a40940051feb3e 1-13
+apps/api/jest.config.ts
+  s_c993aafaa497e8::t_72590d4417f5a9 1-15
+apps/api/nest-cli.json
+  s_c993aafaa497e8::t_9aa47549f91582 1-9
+apps/api/package.json
+  s_c993aafaa497e8::t_df49b9434504ca 1-55
+apps/api/prisma/schema.prisma
+  s_c993aafaa497e8::t_4027954014495f 1-58
+apps/api/src/app.module.ts
+  s_c993aafaa497e8::t_17c4632dbe9a9f 1-8
+apps/api/src/health/application/get-health-status.use-case.spec.ts
+  s_c993aafaa497e8::t_9ad9405dcd11cf 1-12
+apps/api/src/health/application/get-health-status.use-case.ts
+  s_c993aafaa497e8::t_d857992c815f5d 1-10
+apps/api/src/health/domain/health-status.ts
+  s_c993aafaa497e8::t_48a99692a81584 1-4
+apps/api/src/health/infrastructure/http/health.controller.ts
+  s_c993aafaa497e8::t_748f70969334cf 1-17
+apps/api/src/health/infrastructure/http/health.module.ts
+  s_c993aafaa497e8::t_a2ab9c069049a6 1-10
+apps/api/src/main.ts
+  s_c993aafaa497e8::t_5b457c028ad82b 1-8
+apps/api/src/server.ts
+  s_c993aafaa497e8::t_334dbd396a9fc2 1-28
+apps/api/src/shared/infrastructure/persistence/prisma/prisma.service.ts
+  s_c993aafaa497e8::t_16adf9a5731f27 1-13
+apps/api/tsconfig.build.json
+  s_c993aafaa497e8::t_a2a37acca8d3d5 1-4
+apps/api/tsconfig.json
+  s_c993aafaa497e8::t_7ac0a859fdb74b 1-12
+apps/api/vercel.json
+  s_c993aafaa497e8::t_9eca5b8d91f372 1-8
+apps/web/next-env.d.ts
+  s_e5befd7b91b12d::t_04dc2fc184d2ef 1-6
+apps/web/next.config.ts
+  s_c993aafaa497e8::t_9c43462aa32435 1-8
+apps/web/src/app/page.tsx
+  s_e5befd7b91b12d::t_45f7aadb40192b 1-35
+apps/web/src/components/ui/button.tsx
+  s_e5befd7b91b12d::t_abbdc8d2584708 1-39
+apps/web/tsconfig.json
+  s_e5befd7b91b12d::t_8087114ff891c2 1-12
+packages/contracts/eslint.config.mjs
+  s_c993aafaa497e8::t_6eee7b297365d2 1-8
+packages/contracts/package.json
+  s_c993aafaa497e8::t_bfe73f7532f58a 1-34
+packages/contracts/src/index.ts
+  s_c993aafaa497e8::t_2c752e871e327d 1-4
+packages/contracts/tsconfig.json
+  s_c993aafaa497e8::t_29f8e426f9e80d 1-9
+packages/contracts/vitest.config.ts
+  s_c993aafaa497e8::t_8f0766a4c8f1c8 1-10
+packages/typescript-config/base.json
+  s_c993aafaa497e8::t_92694736b0f80a 1-20
+packages/typescript-config/nest.json
+  s_c993aafaa497e8::t_86d9a2a923b842 1-12
+packages/typescript-config/nextjs.json
+  s_c993aafaa497e8::t_ba272172fb7ff3 1-13
+packages/typescript-config/package.json
+  s_c993aafaa497e8::t_ac2def995abaad 1-10
+pnpm-lock.yaml
+  s_e5befd7b91b12d::t_5f09330cc9272f 1-12567
+turbo.json
+  s_c993aafaa497e8::t_508569da8bcc01 1-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "53041564ba1dafb909f1cf9ee62cfe23a519328a",
+  "prompts": {},
+  "sessions": {
+    "s_c993aafaa497e8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_000e61ac1ffeCbGXP2NDQrStzR",
+        "model": "kimi-k2.7-code"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    },
+    "s_e5befd7b91b12d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_000e9e63cffemEstow4pvSqoug",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
