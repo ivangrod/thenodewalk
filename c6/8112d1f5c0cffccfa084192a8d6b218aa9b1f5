@@ -1,0 +1,19 @@
+apps/web/src/app/page.test.tsx
+  s_e5befd7b91b12d::t_8466f0b93ea726 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c68112d1f5c0cffccfa084192a8d6b218aa9b1f5",
+  "prompts": {},
+  "sessions": {
+    "s_e5befd7b91b12d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_000e9e63cffemEstow4pvSqoug",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
