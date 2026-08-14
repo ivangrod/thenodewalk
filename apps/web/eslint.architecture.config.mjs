@@ -6,7 +6,7 @@ const restrictedLayers = (groups) => [
   {
     patterns: groups.map((group) => ({
       group: [`**/${group}/**`, `@/**/${group}/**`],
-      message: `La capa actual no puede depender de ${group}.`,
+      message: `The current layer must not depend on ${group}.`,
     })),
   },
 ];

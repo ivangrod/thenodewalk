@@ -1,8 +1,8 @@
 # Web
 
-Aplicacion Next.js de The Node Walk. La UI usa Tailwind CSS, componentes compatibles con shadcn/ui y Zustand para estado cliente puntual.
+The Node Walk Next.js application. The UI uses Tailwind CSS, shadcn/ui-compatible components, and Zustand for focused client state.
 
-## Comandos
+## Commands
 
 ```sh
 pnpm --filter @thenodewalk/web dev
@@ -10,15 +10,15 @@ pnpm --filter @thenodewalk/web test
 pnpm --filter @thenodewalk/web test:e2e
 ```
 
-Antes de ejecutar Playwright por primera vez instala el navegador con `pnpm exec playwright install chromium`.
+Before running Playwright for the first time, install the browser with `pnpm exec playwright install chromium`.
 
-## Arquitectura
+## Architecture
 
-Cada funcionalidad vive en `src/features/<feature>/`:
+Each feature lives in `src/features/<feature>/`:
 
-- `domain`: reglas y tipos puros, sin dependencias de framework.
-- `application`: casos de uso y puertos.
-- `infrastructure`: adaptadores HTTP, persistencia o navegador.
-- `presentation`: componentes y rutas de interfaz.
+- `domain`: pure rules and types, with no framework dependencies.
+- `application`: use cases and ports.
+- `infrastructure`: HTTP, persistence, or browser adapters.
+- `presentation`: interface components and routes.
 
-`pnpm lint:architecture` impide que las capas interiores importen las exteriores.
+`pnpm lint:architecture` prevents inner layers from importing outer layers.

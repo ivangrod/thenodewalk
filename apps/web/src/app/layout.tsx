@@ -8,12 +8,12 @@ export const metadata: Metadata = {
     default: 'The Node Walk',
     template: '%s | The Node Walk',
   },
-  description: 'Convierte ideas en mapas conectados y accionables.',
+  description: 'Turn ideas into connected, actionable maps.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

@@ -18,7 +18,7 @@ export async function createApp() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('The Node Walk API')
-    .setDescription('API REST para construir y recorrer mapas mentales.')
+    .setDescription('REST API for building and navigating mind maps.')
     .setVersion('0.1.0')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

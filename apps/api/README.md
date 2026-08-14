@@ -1,8 +1,8 @@
 # API
 
-API REST NestJS de The Node Walk, preparada como funcion serverless de Vercel. Swagger esta disponible en `/docs` y el endpoint de salud en `/health`.
+The Node Walk NestJS REST API, prepared as a Vercel serverless function. Swagger is available at `/docs` and the health endpoint at `/health`.
 
-## Comandos
+## Commands
 
 ```sh
 pnpm --filter @thenodewalk/api dev
@@ -11,17 +11,17 @@ pnpm --filter @thenodewalk/api test:e2e
 pnpm --filter @thenodewalk/api prisma:generate
 ```
 
-## Prisma y Supabase
+## Prisma and Supabase
 
-El esquema utiliza PostgreSQL. Para una conexion real, define `DATABASE_URL` en el entorno y ejecuta `pnpm --filter @thenodewalk/api prisma:migrate`. El repositorio no contiene credenciales ni configuracion de una instancia concreta.
+The schema uses PostgreSQL. For a real connection, define `DATABASE_URL` in the environment and run `pnpm --filter @thenodewalk/api prisma:migrate`. The repository contains no credentials or configuration for a specific instance.
 
-## Arquitectura
+## Architecture
 
-Cada contexto usa cuatro zonas:
+Each context uses four areas:
 
-- `domain`: entidades, valores y puertos puros.
-- `application`: casos de uso que coordinan el dominio.
-- `infrastructure`: adaptadores de entrada y salida, Prisma y NestJS.
-- `shared/infrastructure`: tecnologia reutilizable entre contextos.
+- `domain`: pure entities, values, and ports.
+- `application`: use cases that coordinate the domain.
+- `infrastructure`: inbound and outbound adapters, Prisma, and NestJS.
+- `shared/infrastructure`: reusable technology shared between contexts.
 
-`pnpm lint:architecture` prohíbe dependencias desde dominio a capas exteriores y desde aplicacion a infraestructura.
+`pnpm lint:architecture` prohibits dependencies from the domain to outer layers and from application to infrastructure.

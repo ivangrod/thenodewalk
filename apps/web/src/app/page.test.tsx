@@ -7,7 +7,7 @@ describe('HomePage', () => {
   it('presents a clear entry point to create a map', () => {
     render(<HomePage />);
 
-    expect(screen.getByRole('heading', { name: /da forma a las ideas/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /crear mi primer mapa/i })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: /give shape to ideas/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create my first map/i })).toBeEnabled();
   });
 });

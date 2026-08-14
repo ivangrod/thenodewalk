@@ -19,15 +19,15 @@ export default function HomePage() {
           id="welcome-title"
           className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl"
         >
-          Da forma a las ideas que todavia estan conectandose.
+          Give shape to ideas that are still coming together.
         </h1>
         <p className="mt-5 max-w-xl text-pretty text-lg leading-8 text-muted-foreground">
-          Crea un mapa mental visual: enlaza conceptos, abre sus tarjetas y avanza por tu
-          pensamiento sin perder el contexto.
+          Create a visual mind map: connect concepts, open their cards, and move through your
+          thinking without losing context.
         </p>
         <Button className="mt-8" size="lg">
           <Plus aria-hidden="true" />
-          Crear mi primer mapa
+          Create my first map
         </Button>
       </section>
     </main>

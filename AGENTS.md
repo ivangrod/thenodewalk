@@ -1,31 +1,31 @@
-# The Node Walk - Instrucciones de desarrollo
+# The Node Walk - Development Instructions
 
-## Contexto
+## Context
 
-The Node Walk es un SaaS para crear mapas mentales como grafos. Un mapa contiene nodos y aristas; cada nodo puede abrir una tarjeta visual con informacion adicional.
+The Node Walk is a SaaS for creating graph-based mind maps. A map contains nodes and edges; each node can open a visual card with additional information.
 
-## Principios obligatorios
+## Required Principles
 
-- Todo el codigo de produccion y pruebas usa TypeScript estricto.
-- Conserva la Arquitectura Hexagonal. El dominio no importa frameworks, NestJS, Prisma, Next.js, React ni adaptadores de red.
-- Los casos de uso viven en `application` y dependen de puertos definidos hacia dentro. Las implementaciones de puertos pertenecen a `infrastructure`.
-- No accedas a Prisma desde controladores ni casos de uso. Introduce un puerto de repositorio en el dominio o aplicacion y un adaptador Prisma en infraestructura.
-- En el frontend, el estado del servidor debe quedarse cerca de su limite de datos; usa Zustand solo para estado cliente compartido e interactivo.
-- Mantiene los componentes accesibles: HTML semantico, controles con nombre accesible, teclado, foco visible y contraste suficiente.
-- Evita dependencias de cliente innecesarias y revisa Core Web Vitals al añadir interfaces de grafos o librerias de visualizacion.
+- All production and test code uses strict TypeScript.
+- Preserve Hexagonal Architecture. The domain must not import frameworks, NestJS, Prisma, Next.js, React, or network adapters.
+- Use cases live in `application` and depend on ports defined inward. Port implementations belong in `infrastructure`.
+- Do not access Prisma from controllers or use cases. Introduce a repository port in the domain or application and a Prisma adapter in infrastructure.
+- On the frontend, server state must remain close to its data boundary; use Zustand only for shared, interactive client state.
+- Keep components accessible: semantic HTML, controls with accessible names, keyboard support, visible focus, and sufficient contrast.
+- Avoid unnecessary client dependencies and review Core Web Vitals when adding graph interfaces or visualization libraries.
 
-## Estructura
+## Structure
 
-- `apps/web`: Next.js y la interfaz.
-- `apps/api`: NestJS, Prisma y API REST.
-- `packages/contracts`: contratos TypeScript intercambiados entre aplicaciones.
-- `packages/typescript-config`: configuracion TypeScript comun.
+- `apps/web`: Next.js and the interface.
+- `apps/api`: NestJS, Prisma, and the REST API.
+- `packages/contracts`: TypeScript contracts shared between applications.
+- `packages/typescript-config`: shared TypeScript configuration.
 
-Cada funcionalidad se organiza por contexto, no por tipo global. Ejemplo: `apps/api/src/mind-map/{domain,application,infrastructure}`.
+Organize each feature by context, not by global type. Example: `apps/api/src/mind-map/{domain,application,infrastructure}`.
 
-## Verificacion requerida
+## Required Verification
 
-Ejecuta antes de dar una tarea por terminada:
+Run these before considering a task complete:
 
 ```sh
 pnpm format:check
@@ -35,4 +35,4 @@ pnpm typecheck
 pnpm test
 ```
 
-Las pruebas E2E se ejecutan de forma separada con `pnpm test:e2e`. Playwright comprueba tambien accesibilidad con axe.
+Run E2E tests separately with `pnpm test:e2e`. Playwright also checks accessibility with axe.

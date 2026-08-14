@@ -10,6 +10,10 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "infra:up": "docker compose up --detach",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs --follow",
+    "infra:ps": "docker compose ps",
     "lint": "turbo run lint",
     "lint:architecture": "turbo run lint:architecture",
     "test": "turbo run test",
