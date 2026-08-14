@@ -1,0 +1,12 @@
+{
+  "extends": "@thenodewalk/typescript-config/nest.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "./dist",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "api/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "cypress"]
+}

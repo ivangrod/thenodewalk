@@ -1,0 +1,25 @@
+# Dependencies and package-manager files
+node_modules/
+.pnp.*
+
+# Builds and caches
+.next/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Test artifacts
+playwright-report/
+test-results/
+cypress/screenshots/
+cypress/videos/
+
+# Environment and local tooling
+.env
+.env.*
+!.env.example
+.vercel/
+
+# System files
+.DS_Store

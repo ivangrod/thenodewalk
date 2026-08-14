@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - '@tailwindcss/oxide'
+  - cypress
+  - esbuild
+  - prisma
+  - sharp
+  - unrs-resolver

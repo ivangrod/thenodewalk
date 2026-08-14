@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  mindMaps  MindMap[]
+}
+
+model MindMap {
+  id        String      @id @default(cuid())
+  title     String
+  ownerId   String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  owner     User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  nodes     MindMapNode[]
+  edges     MindMapEdge[]
+
+  @@index([ownerId])
+}
+
+model MindMapNode {
+  id        String        @id @default(cuid())
+  mindMapId String
+  title     String
+  content   Json?
+  position  Json
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  mindMap   MindMap       @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+  sourceOf  MindMapEdge[] @relation("SourceNode")
+  targetOf  MindMapEdge[] @relation("TargetNode")
+
+  @@index([mindMapId])
+}
+
+model MindMapEdge {
+  id           String      @id @default(cuid())
+  mindMapId    String
+  sourceNodeId String
+  targetNodeId String
+  createdAt    DateTime    @default(now())
+  mindMap      MindMap     @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+  sourceNode   MindMapNode @relation("SourceNode", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode   MindMapNode @relation("TargetNode", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId])
+  @@index([mindMapId])
+}

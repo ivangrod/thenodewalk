@@ -1,0 +1,12 @@
+{
+  "extends": "@thenodewalk/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "playwright.config.ts", "vitest.config.ts"]
+}
