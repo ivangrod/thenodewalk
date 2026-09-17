@@ -23,3 +23,8 @@ cypress/videos/
 
 # System files
 .DS_Store
+
+# IDE
+/.idea/**.xml
+/.idea/*/**.xml
+/.idea/**.iml

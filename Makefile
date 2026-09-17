@@ -1,0 +1,17 @@
+claude-symlinks:
+	@bash scripts/generate-claude-symlinks.sh
+
+codex-symlinks:
+	@bash scripts/generate-codex-symlinks.sh
+
+copilot-symlinks:
+	@bash scripts/generate-copilot-symlinks.sh
+
+cursor-symlinks:
+	@bash scripts/generate-cursor-symlinks.sh
+
+junie-symlinks:
+	@bash scripts/generate-junie-symlinks.sh
+
+opencode-symlinks:
+	@bash scripts/generate-opencode-symlinks.sh
