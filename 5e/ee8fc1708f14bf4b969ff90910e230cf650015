@@ -1,0 +1,14 @@
+deliverables/gh-1/tech_plan.md
+  h_a3b97539b00b18 7,18,50,53,81-97,102-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5eee8fc1708f14bf4b969ff90910e230cf650015",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
