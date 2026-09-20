@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Engineering blogs</title>
+  </head>
+  <body>
+    <outline
+      text="Netflix Tech Blog"
+      title="Netflix Tech Blog"
+      type="rss"
+      xmlUrl="https://netflixtechblog.com/feed"
+      htmlUrl="https://netflixtechblog.com"
+    />
+    <outline
+      text="AWS Architecture Blog"
+      title="AWS Architecture Blog"
+      type="rss"
+      xmlUrl="https://aws.amazon.com/blogs/architecture/feed/"
+      htmlUrl="https://aws.amazon.com/blogs/architecture/"
+    />
+  </body>
+</opml>
