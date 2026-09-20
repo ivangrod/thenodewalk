@@ -1,0 +1,25 @@
+apps/api/package.json
+  s_4193b7b36d2b16::t_63887e3a1674da 9,23,30,33-34,36,41,44,47
+apps/api/src/knowledge/application/testing/knowledge-test-doubles.ts
+  s_4193b7b36d2b16::t_b6200a335a5478 1-90
+apps/api/src/knowledge/infrastructure/feed/opml-feed-subscription.reader.ts
+  s_4193b7b36d2b16::t_f9412dfd75cc2e 1-33
+pnpm-lock.yaml
+  s_4193b7b36d2b16::t_bb5ed5597ed55f 23-25,44-46,53-58,62-64,72-74,90-92,930-933,1388-1391,2006-2008,2062-2064,2818-2852,3248-3250,3255-3258,3463,4790-4792,4861-4863,5189-5191,5219-5222,5874-5876,6057-6059,6143-6150,6784-6785,7302-7303,7864-7870,7926-7927,8845-8869,9239-9240,9243-9244,9442-9443,9470,9481,9505,9512,9542,9553,11212-11215,11299-11302,11626-11630,11666-11667,12359-12360,12595-12596,12698-12704
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8be054679b5dbe5996df90eab0bf105db877ccb0",
+  "prompts": {},
+  "sessions": {
+    "s_4193b7b36d2b16": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f503bc582ffeiQak70FoUNm7I4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
