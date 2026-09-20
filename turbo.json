@@ -1,8 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["CHROMA_URL", "OLLAMA_URL", "OLLAMA_EMBEDDING_MODEL", "OLLAMA_LLM_MODEL"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["NEXT_PUBLIC_API_URL"],
       "outputs": [".next/**", "dist/**", "!dist/cache/**"]
     },
     "dev": {

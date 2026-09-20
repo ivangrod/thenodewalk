@@ -19,5 +19,20 @@ services:
       retries: 10
       start_period: 5s
 
+  chromadb:
+    image: chromadb/chroma:1.5.3
+    restart: unless-stopped
+    ports:
+      - '${CHROMA_PORT:-8000}:8000'
+    volumes:
+      - chroma-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8000/api/v2/heartbeat']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   postgres-data:
+  chroma-data:
