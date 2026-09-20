@@ -1,0 +1,32 @@
+apps/api/.env.example
+  h_a3b97539b00b18 3-12
+apps/web/.env.example
+  h_a3b97539b00b18 1-2
+apps/web/src/app/ask/page.test.tsx
+  h_a3b97539b00b18 1-28
+apps/web/src/app/ask/page.tsx
+  h_a3b97539b00b18 1-16
+apps/web/src/features/technical-query/domain/technical-query.ts
+  h_a3b97539b00b18 1-13
+apps/web/src/features/technical-query/presentation/components/TechnicalQueryForm.tsx
+  h_a3b97539b00b18 1-47
+apps/web/src/features/technical-query/presentation/components/TechnicalQueryView.tsx
+  h_a3b97539b00b18 1-51
+apps/web/src/features/technical-query/presentation/hooks/useTechnicalQuery.ts
+  h_a3b97539b00b18 1-36
+compose.yaml
+  h_a3b97539b00b18 22-35,38
+turbo.json
+  h_a3b97539b00b18 3,7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0a753848a31ff1ef98babeba0c3e4d9bbb2d70d",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
