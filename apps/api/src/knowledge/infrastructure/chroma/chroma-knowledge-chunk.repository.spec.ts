@@ -17,6 +17,7 @@ class FakeChromaCollection implements ChromaCollectionGateway {
     documents: [[]],
     embeddings: [[]],
     metadatas: [[]],
+    distances: [[]],
   };
 
   upsert(params: UpsertParams): Promise<void> {
@@ -78,7 +79,7 @@ describe('ChromaKnowledgeChunkRepository', () => {
     expect(fake.upsertParams).toBeUndefined();
   });
 
-  it('maps a query result back into knowledge chunks', async () => {
+  it('maps a query result back into scored knowledge chunks', async () => {
     const fake = new FakeChromaCollection();
     const metadata: Metadata = {
       blogName: 'AWS Architecture Blog',
@@ -92,16 +93,19 @@ describe('ChromaKnowledgeChunkRepository', () => {
       documents: [['retrieved chunk']],
       embeddings: [[[0.5, 0.6]]],
       metadatas: [[metadata]],
+      distances: [[0]],
     };
     const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
 
     const results = await repository.search([0.5, 0.6], 5);
 
     expect(results).toHaveLength(1);
-    expect(results[0]?.document).toBe('retrieved chunk');
-    expect(results[0]?.metadata.articleUrl).toBe(
+    expect(results[0]?.chunk.document).toBe('retrieved chunk');
+    expect(results[0]?.chunk.metadata.articleUrl).toBe(
       'https://aws.amazon.com/blogs/architecture/event-driven',
     );
-    expect(results[0]?.metadata.chunkIndex).toBe(0);
+    expect(results[0]?.chunk.metadata.chunkIndex).toBe(0);
+    // distance 0 -> maximum similarity score of 1.
+    expect(results[0]?.score).toBe(1);
   });
 });

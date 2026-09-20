@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { SharedModule } from '../../shared/infrastructure/shared.module';
+import { AnswerTechnicalQueryQuery } from '../application/answer-technical-query.query';
 import { IngestFeedsCommand } from '../application/ingest-feeds.command';
 import {
   ARTICLE_FEED_READER,
@@ -22,6 +23,7 @@ import {
 } from './chroma/chroma-knowledge-chunk.repository';
 import { OpmlFeedSubscriptionReader } from './feed/opml-feed-subscription.reader';
 import { RssArticleFeedReader } from './feed/rss-article-feed.reader';
+import { TechnicalQueryController } from './http/technical-query.controller';
 import { createOllamaEmbeddingGenerator } from './ollama/ollama-embedding-generator';
 import { ChromaClient } from 'chromadb';
 
@@ -30,13 +32,15 @@ const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
 
 /**
- * Wires the `knowledge` ingestion context: binds every domain port to its
- * concrete adapter and exposes the {@link IngestFeedsCommand}.
+ * Wires the `knowledge` context: binds every domain port to its concrete adapter
+ * and exposes the ingestion command and the technical-query endpoint.
  */
 @Module({
   imports: [SharedModule],
+  controllers: [TechnicalQueryController],
   providers: [
     IngestFeedsCommand,
+    AnswerTechnicalQueryQuery,
     { provide: FEED_SUBSCRIPTION_READER, useClass: OpmlFeedSubscriptionReader },
     { provide: ARTICLE_FEED_READER, useClass: RssArticleFeedReader },
     { provide: READABLE_ARTICLE_READER, useClass: ReadabilityArticleReader },
@@ -59,6 +63,6 @@ const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
         ),
     },
   ],
-  exports: [IngestFeedsCommand],
+  exports: [IngestFeedsCommand, AnswerTechnicalQueryQuery],
 })
 export class KnowledgeModule {}
