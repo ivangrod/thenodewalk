@@ -1,0 +1,19 @@
+apps/api/src/knowledge/infrastructure/knowledge.module.ts
+  s_4193b7b36d2b16::t_58a55778faab53 14,17,51-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5cbed4e04072700eb42308a7c94ab3caaa2a6a34",
+  "prompts": {},
+  "sessions": {
+    "s_4193b7b36d2b16": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f503bc582ffeiQak70FoUNm7I4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
