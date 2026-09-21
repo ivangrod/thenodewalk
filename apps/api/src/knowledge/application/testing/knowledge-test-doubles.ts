@@ -11,7 +11,10 @@ import type {
   KnowledgeChunkRepository,
   KnowledgeSearchMatch,
 } from '../../domain/knowledge-chunk-repository';
+import type { GeneratedGraph } from '../../domain/knowledge-graph';
+import { EMPTY_GRAPH } from '../../domain/knowledge-graph';
 import type { ReadableArticleReader } from '../../domain/readable-article-reader';
+import type { StructuredGraphGenerator } from '../../domain/structured-graph-generator';
 
 export class StubFeedSubscriptionReader implements FeedSubscriptionReader {
   constructor(private readonly subscriptions: FeedSubscription[] = []) {}
@@ -92,5 +95,19 @@ export class RecordingEventBus implements EventBus {
 
   ofType<T extends DomainEvent>(eventName: string): T[] {
     return this.published.filter((event) => event.eventName === eventName) as T[];
+  }
+}
+
+export class StubStructuredGraphGenerator implements StructuredGraphGenerator {
+  readonly calls: { query: string; context: KnowledgeSearchMatch[] }[] = [];
+  result: GeneratedGraph = { summary: 'stub summary', graph: EMPTY_GRAPH };
+  error?: Error;
+
+  generate(query: string, context: KnowledgeSearchMatch[]): Promise<GeneratedGraph> {
+    this.calls.push({ query, context });
+    if (this.error !== undefined) {
+      return Promise.reject(this.error);
+    }
+    return Promise.resolve(this.result);
   }
 }
