@@ -1,0 +1,21 @@
+apps/api/src/knowledge/application/answer-technical-query.query.spec.ts
+  s_4193b7b36d2b16::t_c6d8c430ad27bd 5,9,11-12,19,24-26,30-48,50,54-57,60-61,63,65-67,70-72,74,76-77
+apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts
+  s_4193b7b36d2b16::t_05fd7397e4c759 1-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "031a099cb5d846edafd123563c4836eeddeb2e15",
+  "prompts": {},
+  "sessions": {
+    "s_4193b7b36d2b16": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f503bc582ffeiQak70FoUNm7I4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
