@@ -54,10 +54,14 @@ docs/
 │   ├── accessibility.md
 │   ├── frontend-architecture.md
 │   ├── performance.md
-│   └── state-management.md
+│   ├── state-management.md
+│   └── technical-query-knowledge-graph.md
 ├── monorepo/
 │   ├── shared-contracts.md
 │   └── turborepo-configuration.md
+├── rag/
+│   ├── local-pipeline.md
+│   └── operations-and-verification.md
 └── testing/
     ├── mock-objects.md
     └── object-mothers.md
