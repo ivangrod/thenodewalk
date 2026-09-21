@@ -10,7 +10,7 @@ SaaS for turning ideas into interactive node-and-edge mind maps.
 - Deployment: Vercel. The API includes a serverless adapter.
 - Architecture: Hexagonal, with automated import rules.
 
-## Inicio rapido
+## Quick Start
 
 Requires Node 22 and pnpm 10.24.0.
 
@@ -98,7 +98,7 @@ curl -X POST http://localhost:3001/technical-queries \
 
 The response is `{ summary, graph }`; every graph node links back to its original source URL.
 
-## Comandos
+## Commands
 
 ```sh
 pnpm build
@@ -123,6 +123,6 @@ Configure two Vercel projects from the same repository:
 
 Connection and environment variable configuration is deliberately outside this scaffolding.
 
-## Arquitectura
+## Architecture
 
 Each functional context uses `domain`, `application`, and `infrastructure` layers. The web app may add `presentation` for UI adapters. Details and rules are in `AGENTS.md`; `pnpm lint:architecture` validates them automatically.

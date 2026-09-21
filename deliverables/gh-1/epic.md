@@ -1,45 +1,56 @@
-# Definición de Épica: TechGraph RAG (The Node Walk)
+# Epic Definition: TechGraph RAG (The Node Walk)
 
-## 1. Visión del Proyecto
-El objetivo principal del proyecto es construir un **agregador de inteligencia técnica** a partir de las fuentes más prestigiosas de la ingeniería de software (Airbnb, AWS, Netflix, GitHub, etc., provenientes de un fichero OPML proporcionado). 
-A diferencia de los buscadores tradicionales o los chats genéricos, este sistema actuará como un motor **RAG (Retrieval-Augmented Generation)** que procesará consultas técnicas complejas y devolverá la respuesta estructurada visualmente mediante un **Grafo de Conocimiento Interactivo**. En este grafo, los nodos representarán conceptos clave e incluirán trazabilidad directa (URLs) a la fuente original, y las aristas representarán las relaciones semánticas entre dichos conceptos.
+## 1. Project Vision
 
-La infraestructura estará diseñada para ser **100% open-source, local, y centrada en la privacidad**, aprovechando la potencia del hardware de Apple Silicon (M3 Pro, 36GB RAM) mediante la ejecución de Modelos de Lenguaje Locales (LLMs) con **Ollama**.
+The main goal of the project is to build a **technical intelligence aggregator** from the most prestigious software engineering sources (Airbnb, AWS, Netflix, GitHub, etc., sourced from a provided OPML file).
+Unlike traditional search engines or generic chats, this system will act as a **RAG (Retrieval-Augmented Generation)** engine that processes complex technical queries and returns the answer visually structured through an **Interactive Knowledge Graph**. In this graph, nodes represent key concepts and include direct traceability (URLs) back to the original source, while edges represent the semantic relationships between those concepts.
 
-## 2. Épicas Principales
+The infrastructure will be designed to be **100% open-source, local, and privacy-focused**, leveraging the power of Apple Silicon hardware (M3 Pro, 36GB RAM) by running Local Language Models (LLMs) with **Ollama**.
 
-### Épica 1: Ingesta Automática y Refinamiento de Conocimiento (Data Pipeline)
-**Objetivo:** Extraer, limpiar y fragmentar continuamente el conocimiento de los blogs de ingeniería.
-* **Historias de Usuario / Tareas:**
-  * Parsear el fichero `engineering_blogs.opml` para mantener la lista de suscripciones (Feeds RSS).
-  * Desarrollar un *worker* en Node.js que consulte periódicamente los RSS feeds en busca de nuevos artículos.
-  * Implementar extracción de texto limpio (removiendo menús, anuncios, y HTML innecesario) utilizando librerías como `@mozilla/readability`.
-  * Diseñar un mecanismo de *Chunking* semántico para dividir artículos largos en fragmentos procesables (ej. 500-1000 tokens).
+## 2. Main Epics
 
-### Épica 2: Motor de Almacenamiento Vectorial Local
-**Objetivo:** Persistir los fragmentos de texto como representaciones matemáticas (vectores) para permitir búsquedas semánticas ultrarrápidas.
-* **Historias de Usuario / Tareas:**
-  * Desplegar **ChromaDB** a través de Docker Compose (`infra:up`).
-  * Integrar el modelo de embeddings local de Ollama (`nomic-embed-text` o `mxbai-embed-large`).
-  * Definir e implementar el esquema de metadatos (Payload) en ChromaDB para garantizar la trazabilidad de los nodos (blog, título, URL, fecha, chunk_index).
+### Epic 1: Automated Ingestion and Knowledge Refinement (Data Pipeline)
 
-### Épica 3: Sistema RAG (Búsqueda y Contextualización)
-**Objetivo:** Recuperar información altamente relevante basándose en la intención de la pregunta del usuario, no solo en palabras clave.
-* **Historias de Usuario / Tareas:**
-  * Construir un endpoint (API) que reciba la consulta (prompt) del usuario.
-  * Vectorizar la consulta usando el mismo modelo de embeddings local.
-  * Consultar ChromaDB para recuperar los fragmentos de texto (chunks) más relevantes (Top-K) junto con sus metadatos (URL de origen).
+**Goal:** Continuously extract, clean, and chunk knowledge from engineering blogs.
 
-### Épica 4: Generación Estructurada de Grafos con LLMs
-**Objetivo:** Forzar a un LLM local a razonar sobre el contexto recuperado y emitir una respuesta en un formato estrictamente predecible (JSON).
-* **Historias de Usuario / Tareas:**
-  * Configurar la conexión con Ollama para instanciar un modelo de razonamiento profundo (`llama3.1:8b`, `qwen2.5:7b` o `qwen2.5:32b`).
-  * Aplicar *Prompt Engineering* avanzado forzando salida JSON.
-  * El esquema JSON resultante debe contener dos arrays: `nodes` (id, label, source_url, snippet) y `edges` (source_id, target_id, relation_label).
+- **User Stories / Tasks:**
+  - Parse the `engineering_blogs.opml` file to maintain the list of subscriptions (RSS Feeds).
+  - Develop a Node.js _worker_ that periodically polls the RSS feeds for new articles.
+  - Implement clean text extraction (removing menus, ads, and unnecessary HTML) using libraries such as `@mozilla/readability`.
+  - Design a semantic _Chunking_ mechanism to split long articles into processable fragments (e.g. 500-1000 tokens).
 
-### Épica 5: Frontend Visual Interactivo (El "Node Walk")
-**Objetivo:** Consumir el JSON estructurado y pintar la respuesta para el usuario.
-* **Historias de Usuario / Tareas:**
-  * Diseñar una UI minimalista con una barra de búsqueda técnica.
-  * Integrar una librería de renderizado de grafos como **React Flow** o **Vis.js**.
-  * Pintar dinámicamente los vértices (Nodos) haciendo que sean clickeables y redirijan al blog técnico originario de esa pieza de información.
+### Epic 2: Local Vector Storage Engine
+
+**Goal:** Persist text fragments as mathematical representations (vectors) to enable ultra-fast semantic search.
+
+- **User Stories / Tasks:**
+  - Deploy **ChromaDB** via Docker Compose (`infra:up`).
+  - Integrate Ollama's local embeddings model (`nomic-embed-text` or `mxbai-embed-large`).
+  - Define and implement the metadata schema (Payload) in ChromaDB to guarantee node traceability (blog, title, URL, date, chunk_index).
+
+### Epic 3: RAG System (Search and Contextualization)
+
+**Goal:** Retrieve highly relevant information based on the intent of the user's question, not just keywords.
+
+- **User Stories / Tasks:**
+  - Build an endpoint (API) that receives the user's query (prompt).
+  - Vectorize the query using the same local embeddings model.
+  - Query ChromaDB to retrieve the most relevant text fragments (chunks) (Top-K) along with their metadata (source URL).
+
+### Epic 4: Structured Graph Generation with LLMs
+
+**Goal:** Force a local LLM to reason over the retrieved context and emit a response in a strictly predictable format (JSON).
+
+- **User Stories / Tasks:**
+  - Configure the connection to Ollama to instantiate a deep-reasoning model (`llama3.1:8b`, `qwen2.5:7b`, or `qwen2.5:32b`).
+  - Apply advanced _Prompt Engineering_ to force JSON output.
+  - The resulting JSON schema must contain two arrays: `nodes` (id, label, source_url, snippet) and `edges` (source_id, target_id, relation_label).
+
+### Epic 5: Interactive Visual Frontend (The "Node Walk")
+
+**Goal:** Consume the structured JSON and render the response for the user.
+
+- **User Stories / Tasks:**
+  - Design a minimalist UI with a technical search bar.
+  - Integrate a graph-rendering library such as **React Flow** or **Vis.js**.
+  - Dynamically render the vertices (Nodes), making them clickable so they redirect to the original technical blog for that piece of information.
