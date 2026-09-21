@@ -1,0 +1,27 @@
+apps/web/package.json
+  s_4193b7b36d2b16::t_8fcfee33586634 18-19,37
+apps/web/src/features/technical-query/infrastructure/technical-query.client.test.ts
+  s_4193b7b36d2b16::t_cbca10418d6d2a 1-41
+apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.test.tsx
+  s_4193b7b36d2b16::t_5b1b41790ee42a 1-51
+apps/web/src/features/technical-query/presentation/components/TechnicalQueryView.tsx
+  s_4193b7b36d2b16::t_74a74b95e35b39 5-6,8,11-17,19,21,41-71,77-84
+pnpm-lock.yaml
+  s_4193b7b36d2b16::t_0c1eb63f402f3e 144-146,170,216,1979-1996,2423-2438,2919-2921,3097-3134,5983-5987,6275-6289,7920-7940,8502-8526,9040-9041,9222-9257,9625,9663,9677,9681,9700,9711,9723,12566-12569,12899-12906,12910
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf232c023a6afd83131fa40655a2e9982eb97f27",
+  "prompts": {},
+  "sessions": {
+    "s_4193b7b36d2b16": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f503bc582ffeiQak70FoUNm7I4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
