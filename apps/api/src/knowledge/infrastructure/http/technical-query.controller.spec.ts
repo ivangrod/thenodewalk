@@ -9,7 +9,7 @@ import { TechnicalQueryController } from './technical-query.controller';
 
 class StubAnswerTechnicalQueryQuery {
   lastQuery?: string;
-  response: TechnicalQueryResponse = { chunks: [] };
+  response: TechnicalQueryResponse = { summary: '', graph: { nodes: [], edges: [] } };
 
   execute(query: string): Promise<TechnicalQueryResponse> {
     this.lastQuery = query;
@@ -21,15 +21,18 @@ describe('TechnicalQueryController', () => {
   it('delegates the question to the query and returns its response', async () => {
     const stub = new StubAnswerTechnicalQueryQuery();
     stub.response = {
-      chunks: [
-        {
-          document: 'chunk',
-          articleTitle: 'title',
-          articleUrl: 'https://blog.test/post',
-          blogName: 'Blog',
-          score: 0.9,
-        },
-      ],
+      summary: 'Netflix uses a federated gateway.',
+      graph: {
+        nodes: [
+          {
+            id: 'gateway',
+            label: 'API Gateway',
+            type: 'concept',
+            sourceUrl: 'https://netflixtechblog.com/post',
+          },
+        ],
+        edges: [],
+      },
     };
     const controller = new TechnicalQueryController(stub as unknown as AnswerTechnicalQueryQuery);
     const body = plainToInstance(TechnicalQueryRequestDto, { query: 'how to scale?' });

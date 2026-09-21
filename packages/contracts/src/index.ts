@@ -7,18 +7,29 @@ export interface TechnicalQueryRequest {
   query: string;
 }
 
-export interface RetrievedChunkDto {
-  document: string;
-  articleTitle: string;
-  articleUrl: string;
-  blogName: string;
-  score: number;
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  type: 'concept';
+  sourceUrl: string;
+}
+
+export interface KnowledgeGraphEdge {
+  source: string;
+  target: string;
+  relationship: string;
+}
+
+export interface KnowledgeGraph {
+  nodes: KnowledgeGraphNode[];
+  edges: KnowledgeGraphEdge[];
 }
 
 /**
- * Interim response for `POST /technical-queries`: the retrieved source chunks.
- * The structured knowledge graph is added on top of this in Phase 4.
+ * Final response for `POST /technical-queries`: a natural-language summary plus
+ * an interactive knowledge graph whose nodes link back to their source URL.
  */
 export interface TechnicalQueryResponse {
-  chunks: RetrievedChunkDto[];
+  summary: string;
+  graph: KnowledgeGraph;
 }
