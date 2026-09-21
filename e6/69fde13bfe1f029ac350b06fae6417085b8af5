@@ -1,0 +1,19 @@
+docs/frontend/technical-query-knowledge-graph.md
+  s_4193b7b36d2b16::t_b4d82fdab6b3f1 1-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e669fde13bfe1f029ac350b06fae6417085b8af5",
+  "prompts": {},
+  "sessions": {
+    "s_4193b7b36d2b16": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f503bc582ffeiQak70FoUNm7I4",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
