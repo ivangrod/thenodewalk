@@ -2,35 +2,46 @@
 
 import { useCallback, useState } from 'react';
 
-import type { TechnicalQueryResult, TechnicalQueryStatus } from '../../domain/technical-query';
+import type { TechnicalQueryResponse } from '@thenodewalk/contracts';
+
+import type { TechnicalQueryStatus } from '../../domain/technical-query';
+import { requestTechnicalQuery } from '../../infrastructure/technical-query.client';
 
 export interface UseTechnicalQuery {
+  ask: (query: string) => Promise<void>;
+  data: TechnicalQueryResponse | null;
   status: TechnicalQueryStatus;
-  result: TechnicalQueryResult | null;
-  submittedQuery: string | null;
-  ask: (query: string) => void;
+  lastQuery: string | null;
 }
 
 /**
- * Owns the data boundary for the technical-query feature.
- *
- * For now it only captures the submitted question so the UI can reserve and
- * label the graph area. Sending the query to `POST /technical-queries` and
- * mapping the structured graph response is added in later plan phases; no
- * network request happens yet.
+ * Presentation adapter that owns the technical-query server-state at its data
+ * boundary: it calls `POST /technical-queries` and exposes the request status
+ * and response to dumb components. Server data is not cached in Zustand.
  */
 export function useTechnicalQuery(): UseTechnicalQuery {
-  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+  const [status, setStatus] = useState<TechnicalQueryStatus>('idle');
+  const [data, setData] = useState<TechnicalQueryResponse | null>(null);
+  const [lastQuery, setLastQuery] = useState<string | null>(null);
 
-  const ask = useCallback((query: string): void => {
+  const ask = useCallback(async (query: string): Promise<void> => {
     const trimmed = query.trim();
-    setSubmittedQuery(trimmed === '' ? null : trimmed);
+    if (trimmed === '') {
+      return;
+    }
+
+    setLastQuery(trimmed);
+    setStatus('loading');
+
+    try {
+      const response = await requestTechnicalQuery(trimmed);
+      setData(response);
+      setStatus('success');
+    } catch {
+      setData(null);
+      setStatus('error');
+    }
   }, []);
 
-  return {
-    status: 'idle',
-    result: null,
-    submittedQuery,
-    ask,
-  };
+  return { ask, data, status, lastQuery };
 }
