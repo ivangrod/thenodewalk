@@ -1,8 +1,11 @@
 import type { Metadata } from 'chromadb';
 
-import { createKnowledgeChunk, type KnowledgeChunk } from '../../domain/knowledge-chunk';
-import type { KnowledgeChunkMetadata } from '../../domain/knowledge-chunk';
-import type { KnowledgeChunkRepository } from '../../domain/knowledge-chunk-repository';
+import { createKnowledgeChunk } from '../../domain/knowledge-chunk';
+import type { KnowledgeChunk, KnowledgeChunkMetadata } from '../../domain/knowledge-chunk';
+import type {
+  KnowledgeChunkRepository,
+  KnowledgeSearchMatch,
+} from '../../domain/knowledge-chunk-repository';
 import type { ChromaCollectionProvider } from './chroma-collection.provider';
 
 export const KNOWLEDGE_CHUNKS_COLLECTION = 'knowledge_chunks';
@@ -29,17 +32,18 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
     });
   }
 
-  async search(embedding: number[], limit: number): Promise<KnowledgeChunk[]> {
+  async search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]> {
     const collection = await this.provider.collection();
     const result = await collection.query({
       queryEmbeddings: [embedding],
       nResults: limit,
-      include: ['documents', 'metadatas', 'embeddings'],
+      include: ['documents', 'metadatas', 'embeddings', 'distances'],
     });
 
     const documents = result.documents[0] ?? [];
     const metadatas = result.metadatas[0] ?? [];
     const embeddings = result.embeddings?.[0] ?? [];
+    const distances = result.distances?.[0] ?? [];
 
     return documents.flatMap((document, index) => {
       const metadata = metadatas[index];
@@ -47,14 +51,25 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
         return [];
       }
 
-      return [
-        createKnowledgeChunk({
-          document,
-          embedding: embeddings[index] ?? [],
-          metadata: this.fromMetadata(metadata),
-        }),
-      ];
+      const chunk = createKnowledgeChunk({
+        document,
+        embedding: embeddings[index] ?? [],
+        metadata: this.fromMetadata(metadata),
+      });
+
+      return [{ chunk, score: this.toScore(distances[index]) }];
     });
+  }
+
+  /**
+   * Converts a distance (lower is closer) into a similarity score in `(0, 1]`
+   * (higher is more relevant).
+   */
+  private toScore(distance: number | null | undefined): number {
+    if (distance === null || distance === undefined) {
+      return 0;
+    }
+    return 1 / (1 + Math.max(0, distance));
   }
 
   private toMetadata(metadata: KnowledgeChunkMetadata): Metadata {

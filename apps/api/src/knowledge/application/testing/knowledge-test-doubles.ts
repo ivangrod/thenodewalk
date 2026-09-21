@@ -7,7 +7,10 @@ import type {
   FeedSubscriptionReader,
 } from '../../domain/feed-subscription-reader';
 import type { KnowledgeChunk } from '../../domain/knowledge-chunk';
-import type { KnowledgeChunkRepository } from '../../domain/knowledge-chunk-repository';
+import type {
+  KnowledgeChunkRepository,
+  KnowledgeSearchMatch,
+} from '../../domain/knowledge-chunk-repository';
 import type { ReadableArticleReader } from '../../domain/readable-article-reader';
 
 export class StubFeedSubscriptionReader implements FeedSubscriptionReader {
@@ -57,7 +60,9 @@ export class StubEmbeddingGenerator implements EmbeddingGenerator {
 
 export class InMemoryKnowledgeChunkRepository implements KnowledgeChunkRepository {
   readonly upsertCalls: KnowledgeChunk[][] = [];
+  readonly searchCalls: { embedding: number[]; limit: number }[] = [];
   readonly store = new Map<string, KnowledgeChunk>();
+  matches: KnowledgeSearchMatch[] = [];
 
   upsert(chunks: KnowledgeChunk[]): Promise<void> {
     this.upsertCalls.push(chunks);
@@ -67,8 +72,9 @@ export class InMemoryKnowledgeChunkRepository implements KnowledgeChunkRepositor
     return Promise.resolve();
   }
 
-  search(): Promise<KnowledgeChunk[]> {
-    return Promise.resolve([...this.store.values()]);
+  search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]> {
+    this.searchCalls.push({ embedding, limit });
+    return Promise.resolve(this.matches);
   }
 
   get lastUpsert(): KnowledgeChunk[] {

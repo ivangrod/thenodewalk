@@ -20,6 +20,7 @@ export interface ChromaCollectionGateway {
     documents: (string | null)[][];
     embeddings: (number[] | null)[][] | null;
     metadatas: (Metadata | null)[][];
+    distances: (number | null)[][] | null;
   }>;
 }
 
