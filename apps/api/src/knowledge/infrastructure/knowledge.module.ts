@@ -11,8 +11,10 @@ import {
   READABLE_ARTICLE_READER,
   STRUCTURED_GRAPH_GENERATOR,
 } from '../application/knowledge.tokens';
+import type { ArticleFeedReader } from '../domain/article-feed-reader';
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
+import type { ReadableArticleReader } from '../domain/readable-article-reader';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
 import { ReadabilityArticleReader } from './article/readability-article.reader';
 import {
@@ -46,8 +48,14 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
     IngestFeedsCommand,
     AnswerTechnicalQueryQuery,
     { provide: FEED_SUBSCRIPTION_READER, useClass: OpmlFeedSubscriptionReader },
-    { provide: ARTICLE_FEED_READER, useClass: RssArticleFeedReader },
-    { provide: READABLE_ARTICLE_READER, useClass: ReadabilityArticleReader },
+    {
+      provide: ARTICLE_FEED_READER,
+      useFactory: (): ArticleFeedReader => new RssArticleFeedReader(),
+    },
+    {
+      provide: READABLE_ARTICLE_READER,
+      useFactory: (): ReadableArticleReader => new ReadabilityArticleReader(),
+    },
     {
       provide: EMBEDDING_GENERATOR,
       useFactory: (): EmbeddingGenerator =>
