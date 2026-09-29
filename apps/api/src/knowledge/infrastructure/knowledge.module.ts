@@ -7,12 +7,14 @@ import {
   ARTICLE_FEED_READER,
   EMBEDDING_GENERATOR,
   FEED_SUBSCRIPTION_READER,
+  INGESTION_PROGRESS_REPORTER,
   KNOWLEDGE_CHUNK_REPOSITORY,
   READABLE_ARTICLE_READER,
   STRUCTURED_GRAPH_GENERATOR,
 } from '../application/knowledge.tokens';
 import type { ArticleFeedReader } from '../domain/article-feed-reader';
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
+import type { IngestionProgressReporter } from '../domain/ingestion-progress-reporter';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
 import type { ReadableArticleReader } from '../domain/readable-article-reader';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
@@ -28,6 +30,7 @@ import {
 import { OpmlFeedSubscriptionReader } from './feed/opml-feed-subscription.reader';
 import { RssArticleFeedReader } from './feed/rss-article-feed.reader';
 import { TechnicalQueryController } from './http/technical-query.controller';
+import { createLoggerIngestionProgressReporter } from './logging/logger-ingestion-progress-reporter';
 import { createOllamaEmbeddingGenerator } from './ollama/ollama-embedding-generator';
 import { createOllamaStructuredGraphGenerator } from './ollama/ollama-structured-graph-generator';
 import { ChromaClient } from 'chromadb';
@@ -81,6 +84,10 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
           process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL,
           process.env.OLLAMA_LLM_MODEL ?? DEFAULT_LLM_MODEL,
         ),
+    },
+    {
+      provide: INGESTION_PROGRESS_REPORTER,
+      useFactory: (): IngestionProgressReporter => createLoggerIngestionProgressReporter(),
     },
   ],
   exports: [IngestFeedsCommand, AnswerTechnicalQueryQuery],

@@ -6,6 +6,10 @@ import type {
   FeedSubscription,
   FeedSubscriptionReader,
 } from '../../domain/feed-subscription-reader';
+import type {
+  FeedIngestionProgress,
+  IngestionProgressReporter,
+} from '../../domain/ingestion-progress-reporter';
 import type { KnowledgeChunk } from '../../domain/knowledge-chunk';
 import type {
   KnowledgeChunkRepository,
@@ -15,6 +19,15 @@ import type { GeneratedGraph } from '../../domain/knowledge-graph';
 import { EMPTY_GRAPH } from '../../domain/knowledge-graph';
 import type { ReadableArticleReader } from '../../domain/readable-article-reader';
 import type { StructuredGraphGenerator } from '../../domain/structured-graph-generator';
+
+export type FeedProgressReport =
+  | { status: 'in progress'; progress: FeedIngestionProgress }
+  | {
+      status: 'completed';
+      progress: FeedIngestionProgress;
+      totals: { articles: number; chunks: number };
+    }
+  | { status: 'failed'; progress: FeedIngestionProgress; reason: string };
 
 export class StubFeedSubscriptionReader implements FeedSubscriptionReader {
   constructor(private readonly subscriptions: FeedSubscription[] = []) {}
@@ -95,6 +108,25 @@ export class RecordingEventBus implements EventBus {
 
   ofType<T extends DomainEvent>(eventName: string): T[] {
     return this.published.filter((event) => event.eventName === eventName) as T[];
+  }
+}
+
+export class RecordingIngestionProgressReporter implements IngestionProgressReporter {
+  readonly reports: FeedProgressReport[] = [];
+
+  feedStarted(progress: FeedIngestionProgress): void {
+    this.reports.push({ status: 'in progress', progress });
+  }
+
+  feedCompleted(
+    progress: FeedIngestionProgress,
+    totals: { articles: number; chunks: number },
+  ): void {
+    this.reports.push({ status: 'completed', progress, totals });
+  }
+
+  feedFailed(progress: FeedIngestionProgress, reason: string): void {
+    this.reports.push({ status: 'failed', progress, reason });
   }
 }
 

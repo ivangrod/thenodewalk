@@ -2,6 +2,7 @@ import { IngestFeedsCommand } from './ingest-feeds.command';
 import {
   InMemoryKnowledgeChunkRepository,
   RecordingEventBus,
+  RecordingIngestionProgressReporter,
   StubArticleFeedReader,
   StubEmbeddingGenerator,
   StubFeedSubscriptionReader,
@@ -30,10 +31,12 @@ function buildCommand(scenario: Scenario): {
   repository: InMemoryKnowledgeChunkRepository;
   eventBus: RecordingEventBus;
   embeddings: StubEmbeddingGenerator;
+  progress: RecordingIngestionProgressReporter;
 } {
   const repository = new InMemoryKnowledgeChunkRepository();
   const eventBus = new RecordingEventBus();
   const embeddings = new StubEmbeddingGenerator(EMBEDDING);
+  const progress = new RecordingIngestionProgressReporter();
   const command = new IngestFeedsCommand(
     new StubFeedSubscriptionReader(scenario.subscriptions),
     new StubArticleFeedReader(scenario.articlesByFeedUrl, scenario.failuresByFeedUrl),
@@ -41,9 +44,10 @@ function buildCommand(scenario: Scenario): {
     embeddings,
     repository,
     eventBus,
+    progress,
   );
 
-  return { command, repository, eventBus, embeddings };
+  return { command, repository, eventBus, embeddings, progress };
 }
 
 describe('IngestFeedsCommand', () => {
@@ -175,5 +179,76 @@ describe('IngestFeedsCommand', () => {
       reason: 'feed unreachable',
     });
     expect(eventBus.ofType('knowledge.ingestion.completed')).toHaveLength(1);
+  });
+
+  it('reports every feed as in progress with its position before ingesting it', async () => {
+    const first = FeedSubscriptionMother.create({ feedUrl: 'https://first.test/feed' });
+    const second = FeedSubscriptionMother.create({ feedUrl: 'https://second.test/feed' });
+    const { command, progress } = buildCommand({ subscriptions: [first, second] });
+
+    await command.execute(OPML_PATH);
+
+    const started = progress.reports.filter((report) => report.status === 'in progress');
+    expect(started.map((report) => report.progress)).toEqual([
+      { position: 1, total: 2, blogName: first.blogName, feedUrl: first.feedUrl },
+      { position: 2, total: 2, blogName: second.blogName, feedUrl: second.feedUrl },
+    ]);
+    expect(progress.reports[0]?.status).toBe('in progress');
+  });
+
+  it('reports a feed as completed with its article and chunk totals', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const articles = [
+      FeedArticleMother.create({ url: 'https://blog.test/post-1' }),
+      FeedArticleMother.create({ url: 'https://blog.test/post-2' }),
+    ];
+    const { command, progress } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, articles]]),
+      defaultText: 'short article content',
+    });
+
+    await command.execute(OPML_PATH);
+
+    expect(progress.reports).toEqual([
+      {
+        status: 'in progress',
+        progress: {
+          position: 1,
+          total: 1,
+          blogName: subscription.blogName,
+          feedUrl: subscription.feedUrl,
+        },
+      },
+      {
+        status: 'completed',
+        progress: {
+          position: 1,
+          total: 1,
+          blogName: subscription.blogName,
+          feedUrl: subscription.feedUrl,
+        },
+        totals: { articles: 2, chunks: 2 },
+      },
+    ]);
+  });
+
+  it('reports a failed feed and keeps reporting the remaining ones', async () => {
+    const broken = FeedSubscriptionMother.create({ feedUrl: 'https://broken.test/feed' });
+    const healthy = FeedSubscriptionMother.create({ feedUrl: 'https://ok.test/feed' });
+    const { command, progress } = buildCommand({
+      subscriptions: [broken, healthy],
+      failuresByFeedUrl: new Map([[broken.feedUrl, new Error('feed unreachable')]]),
+    });
+
+    await command.execute(OPML_PATH);
+
+    expect(progress.reports.map((report) => [report.status, report.progress.position])).toEqual([
+      ['in progress', 1],
+      ['failed', 1],
+      ['in progress', 2],
+      ['completed', 2],
+    ]);
+    expect(progress.reports[1]).toMatchObject({ status: 'failed', reason: 'feed unreachable' });
   });
 });
