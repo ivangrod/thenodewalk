@@ -68,7 +68,8 @@ cp apps/web/.env.example apps/web/.env.local
 ```
 
 Defaults work out of the box. Relevant variables: `CHROMA_URL`, `OLLAMA_URL`,
-`OLLAMA_EMBEDDING_MODEL`, and `OLLAMA_LLM_MODEL` (API); `NEXT_PUBLIC_API_URL` (web).
+`OLLAMA_EMBEDDING_MODEL`, `OLLAMA_LLM_MODEL`, `OLLAMA_LLM_CONTEXT_LENGTH` (default `8192`), and
+`OLLAMA_LLM_KEEP_ALIVE` (default `30m`) (API); `NEXT_PUBLIC_API_URL` (web).
 
 ### Ingest engineering blogs
 
@@ -97,6 +98,29 @@ curl -X POST http://localhost:3001/technical-queries \
 ```
 
 The response is `{ summary, graph }`; every graph node links back to its original source URL.
+
+### Local Ollama performance
+
+The API always sends its own bounded context window (`OLLAMA_LLM_CONTEXT_LENGTH`, default `8192`)
+and `keep_alive` (`OLLAMA_LLM_KEEP_ALIVE`, default `30m`) with every generation request, so `/ask`
+stays fast regardless of your machine's Ollama configuration. Still, on macOS:
+
+- Keep the Ollama app's "Context length" setting bounded (8k is enough). A much larger window
+  (128k+) makes `llama3.1:8b` reserve a multi-GiB KV cache and can freeze the host.
+- Install `scripts/macos/ollama-env.plist` as a LaunchAgent so `OLLAMA_FLASH_ATTENTION`,
+  `OLLAMA_KV_CACHE_TYPE`, and `OLLAMA_KEEP_ALIVE` are set on every login, not just the current
+  terminal session:
+
+  ```sh
+  mkdir -p ~/Library/LaunchAgents
+  cp scripts/macos/ollama-env.plist ~/Library/LaunchAgents/com.thenodewalk.ollama-env.plist
+  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.thenodewalk.ollama-env.plist
+  ```
+
+  Quit and reopen Ollama.app afterward for it to pick up the new values.
+
+See [RAG Operations and Verification](docs/rag/operations-and-verification.md) for the full
+diagnosis and how to verify it.
 
 ## Commands
 

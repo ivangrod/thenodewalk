@@ -1,6 +1,8 @@
 import {
+  DEFAULT_OLLAMA_GENERATION_SETTINGS,
   InvalidStructuredGraphError,
   OllamaStructuredGraphGenerator,
+  ollamaGenerationSettingsFromEnv,
   parseGeneratedGraph,
   type OllamaChatClient,
 } from './ollama-structured-graph-generator';
@@ -49,6 +51,32 @@ describe('OllamaStructuredGraphGenerator', () => {
     expect(result.graph.nodes).toHaveLength(2);
     expect(result.graph.nodes[0]?.sourceUrl).toBe('https://blog.test/kafka');
     expect(result.graph.edges).toHaveLength(1);
+  });
+
+  it('bounds the context window and keeps the model loaded with the default settings', async () => {
+    const client = new FakeOllamaChatClient(VALID_JSON);
+    const generator = new OllamaStructuredGraphGenerator(client, 'llama3.1:8b');
+
+    await generator.generate('What is Kafka?', [context('https://blog.test/kafka')]);
+
+    expect(client.lastRequest?.options).toEqual({
+      temperature: 0,
+      num_ctx: DEFAULT_OLLAMA_GENERATION_SETTINGS.contextLength,
+    });
+    expect(client.lastRequest?.keep_alive).toBe(DEFAULT_OLLAMA_GENERATION_SETTINGS.keepAlive);
+  });
+
+  it('sends the configured context window and keep-alive', async () => {
+    const client = new FakeOllamaChatClient(VALID_JSON);
+    const generator = new OllamaStructuredGraphGenerator(client, 'llama3.1:8b', {
+      contextLength: 4096,
+      keepAlive: -1,
+    });
+
+    await generator.generate('What is Kafka?', [context('https://blog.test/kafka')]);
+
+    expect(client.lastRequest?.options?.num_ctx).toBe(4096);
+    expect(client.lastRequest?.keep_alive).toBe(-1);
   });
 
   it('throws for non-JSON output', async () => {
@@ -150,5 +178,32 @@ describe('parseGeneratedGraph', () => {
     });
 
     expect(parseGeneratedGraph(raw).graph.centralNodeId).toBeNull();
+  });
+});
+
+describe('ollamaGenerationSettingsFromEnv', () => {
+  it('falls back to the defaults when the values are missing or blank', () => {
+    expect(ollamaGenerationSettingsFromEnv({})).toEqual(DEFAULT_OLLAMA_GENERATION_SETTINGS);
+    expect(ollamaGenerationSettingsFromEnv({ contextLength: ' ', keepAlive: '' })).toEqual(
+      DEFAULT_OLLAMA_GENERATION_SETTINGS,
+    );
+  });
+
+  it('parses the context length and a duration keep-alive', () => {
+    expect(ollamaGenerationSettingsFromEnv({ contextLength: '4096', keepAlive: '1h' })).toEqual({
+      contextLength: 4096,
+      keepAlive: '1h',
+    });
+  });
+
+  it('sends a numeric keep-alive as seconds', () => {
+    expect(ollamaGenerationSettingsFromEnv({ keepAlive: '-1' }).keepAlive).toBe(-1);
+    expect(ollamaGenerationSettingsFromEnv({ keepAlive: '600' }).keepAlive).toBe(600);
+  });
+
+  it.each(['0', '-8', '8.5', 'eight'])('rejects the invalid context length "%s"', (value) => {
+    expect(() => ollamaGenerationSettingsFromEnv({ contextLength: value })).toThrow(
+      'Invalid Ollama context length',
+    );
   });
 });

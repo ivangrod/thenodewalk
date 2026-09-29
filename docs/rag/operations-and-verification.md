@@ -13,8 +13,22 @@ list, and verify the API and web application through the standard test suites.
    `llama3.1:8b` for structured graph generation.
 5. Ingest feeds from `apps/api/feeds/engineering_blogs.opml` through the API ingestion CLI.
 6. Start the apps with `pnpm dev`, use `/ask`, or call `POST /technical-queries` directly.
-7. Run the mandatory format, lint, architecture, typecheck, unit, and E2E suites before
-   considering a change complete.
+7. Keep the Ollama app's global "Context length" setting bounded (8k is enough for the local RAG
+   prompts). A large window (128k+) forces `llama3.1:8b` to reserve a multi-GiB KV cache (16 GiB
+   on Apple Silicon) and can freeze the host. The API already overrides it per request
+   (`OLLAMA_LLM_CONTEXT_LENGTH`, see [Local Pipeline](local-pipeline.md)), but the app-wide
+   setting still affects every other local Ollama client.
+8. Install `scripts/macos/ollama-env.plist` as a LaunchAgent so `OLLAMA_FLASH_ATTENTION`,
+   `OLLAMA_KV_CACHE_TYPE`, and `OLLAMA_KEEP_ALIVE` survive reboots. A bare `launchctl setenv` only
+   lasts for the current login session and is silently lost after the next restart or Ollama
+   update.
+9. Diagnose local incidents from their real source before touching code. A `connection refused`
+   against the API usually means `pnpm dev` is not running. An empty `/ask` answer after touching
+   local infrastructure usually means the `chroma-data` Docker volume was recreated (a Rancher
+   Desktop reset, `docker compose down --volumes`, or a volume prune) and `knowledge_chunks` needs
+   to be ingested again, not that ingestion is broken.
+10. Run the mandatory format, lint, architecture, typecheck, unit, and E2E suites before
+    considering a change complete.
 
 A `knowledge_chunks` collection created before the `PrecomputedEmbeddingFunction` guard keeps a
 `default` embedding function in its server-side configuration, and the SDK keeps logging the
@@ -37,6 +51,10 @@ and does not require ChromaDB or Ollama. The E2E flow must run Axe after the gra
 - Keeps production-like HTTP wiring covered while tests remain deterministic and fast.
 - Detects Nest dependency-injection failures that unit tests of isolated classes miss.
 - Verifies browser behavior, external source navigation, and accessibility in a real engine.
+- Keeps `/ask` responsive on any contributor's machine regardless of the local Ollama GUI
+  configuration.
+- Makes common local incidents (API not running, wiped vector store) quick to diagnose from
+  logs and container state instead of guessing or blaming the query code.
 - Avoids flaky E2E tests caused by live feeds, LLM output, or public source websites.
 
 ## Examples
@@ -94,6 +112,56 @@ pnpm test
 pnpm test:e2e
 ```
 
+### ✅ Good: Install the Ollama LaunchAgent once per machine
+
+```sh
+mkdir -p ~/Library/LaunchAgents
+cp scripts/macos/ollama-env.plist ~/Library/LaunchAgents/com.thenodewalk.ollama-env.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.thenodewalk.ollama-env.plist
+```
+
+Quit and reopen Ollama.app, then confirm the values it picked up:
+
+```sh
+grep "server config" ~/.ollama/logs/server.log | tail -1 \
+  | grep -oE "OLLAMA_(FLASH_ATTENTION|KV_CACHE_TYPE|KEEP_ALIVE):[^ ]*"
+```
+
+### ❌ Bad: Setting Ollama env vars only for the current terminal session
+
+```sh
+launchctl setenv OLLAMA_FLASH_ATTENTION 1
+# Works today. Gone after the next reboot, login, or Ollama update, with no error
+# to explain why the freeze or slow generation came back.
+```
+
+### ✅ Good: Confirming the context window before blaming the query code
+
+```sh
+grep "KV buffer size" ~/.ollama/logs/server.log | tail -1
+# ~16384.00 MiB at a 128k context window, ~1024.00 MiB at 8k.
+```
+
+### ❌ Bad: Chasing a "connection refused" in the query code
+
+```sh
+curl -X POST http://localhost:3001/technical-queries -d '{"query":"..."}'
+# curl: (7) Failed to connect to localhost port 3001: Connection refused
+#
+# Reading through AnswerTechnicalQueryQuery or the controller wastes time: check first
+# whether the API process is even running.
+lsof -nP -iTCP:3001 -sTCP:LISTEN   # empty output means the API is not running
+```
+
+### ✅ Good: Confirming the vector store before re-running ingestion
+
+```sh
+docker volume inspect thenodewalk_chroma-data --format '{{.CreatedAt}}'
+# A timestamp from a few minutes ago means the volume was recreated and
+# knowledge_chunks is empty again, not that /ask or ingestion regressed.
+pnpm --filter @thenodewalk/api ingest
+```
+
 ### ❌ Bad: Running a query before its local dependencies are ready
 
 ```sh
@@ -114,6 +182,10 @@ await expect(page.getByText('Exact generated sentence')).toBeVisible();
 ## Real world examples
 
 - Local commands and prerequisites: `README.md`
+- LaunchAgent template for the Ollama env vars: `scripts/macos/ollama-env.plist`
+- Per-request context window and keep-alive: `ollamaGenerationSettingsFromEnv` and
+  `DEFAULT_OLLAMA_GENERATION_SETTINGS` in
+  `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - OPML source list: `apps/api/feeds/engineering_blogs.opml`
 - Runnable ingestion entrypoint: `apps/api/src/knowledge/infrastructure/cli/ingest.ts`
 - HTTP integration test with overridden ports: `apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts`

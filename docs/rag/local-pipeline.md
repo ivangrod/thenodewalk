@@ -46,6 +46,11 @@ fully local:
     the first node. Then `limitGraphDepth` walks the graph breadth-first from the central node,
     ignoring edge direction, and drops farther or disconnected nodes together with their edges.
     The system prompt asks for the same rule, but the domain functions are the source of truth.
+12. Every generation request sends its own bounded context window (`num_ctx`, default 8192
+    tokens) and `keep_alive` (default `30m`), configurable with `OLLAMA_LLM_CONTEXT_LENGTH` and
+    `OLLAMA_LLM_KEEP_ALIVE`. The API must not depend on the global Ollama "Context length"
+    setting: a 128k window makes `llama3.1:8b` reserve a 16 GiB KV cache and freezes the host.
+    Invalid values fail when the API boots.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
@@ -66,6 +71,8 @@ exposes `centralNodeId: string | null`, which is `null` only when the graph has 
 - Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
   `DefaultEmbeddingFunction` warnings in the API logs.
 - Makes long ingestion runs observable feed by feed without polluting the domain event stream.
+- Keeps memory use and latency of `/ask` predictable on any machine and avoids reloading the
+  model between consecutive queries.
 
 ## Examples
 
@@ -140,6 +147,31 @@ return this.toResponse(await this.graphGenerator.generate(query, matches));
 // The prompt asks for at most 3 levels, but nothing guarantees it: nodes may be
 // 5 hops away from the central node, or not connected to it at all.
 return this.toResponse({ summary: generated.summary, graph: generated.graph });
+```
+
+### ✅ Good: Bounded context window and keep-alive on every generation request
+
+```typescript
+await this.client.chat({
+  model: this.model,
+  format: 'json',
+  keep_alive: this.settings.keepAlive, // '30m'
+  options: { temperature: 0, num_ctx: this.settings.contextLength }, // 8192
+  messages,
+});
+```
+
+### ❌ Bad: Inheriting the context window from the global Ollama configuration
+
+```typescript
+// With "Context length" set to 256k in the Ollama app, llama3.1:8b loads a 128k window,
+// reserves a 16 GiB KV cache and unloads again after 5 idle minutes.
+await this.client.chat({
+  model: this.model,
+  format: 'json',
+  options: { temperature: 0 },
+  messages,
+});
 ```
 
 ### ✅ Good: Explicit factory for adapters with local defaults

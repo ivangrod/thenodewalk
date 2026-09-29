@@ -32,7 +32,10 @@ import { RssArticleFeedReader } from './feed/rss-article-feed.reader';
 import { TechnicalQueryController } from './http/technical-query.controller';
 import { createLoggerIngestionProgressReporter } from './logging/logger-ingestion-progress-reporter';
 import { createOllamaEmbeddingGenerator } from './ollama/ollama-embedding-generator';
-import { createOllamaStructuredGraphGenerator } from './ollama/ollama-structured-graph-generator';
+import {
+  createOllamaStructuredGraphGenerator,
+  ollamaGenerationSettingsFromEnv,
+} from './ollama/ollama-structured-graph-generator';
 import { ChromaClient } from 'chromadb';
 
 const DEFAULT_CHROMA_URL = 'http://localhost:8000';
@@ -83,6 +86,10 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
         createOllamaStructuredGraphGenerator(
           process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL,
           process.env.OLLAMA_LLM_MODEL ?? DEFAULT_LLM_MODEL,
+          ollamaGenerationSettingsFromEnv({
+            contextLength: process.env.OLLAMA_LLM_CONTEXT_LENGTH,
+            keepAlive: process.env.OLLAMA_LLM_KEEP_ALIVE,
+          }),
         ),
     },
     {

@@ -52,9 +52,34 @@ export interface OllamaChatClient {
     model: string;
     messages: { role: string; content: string }[];
     format?: string | object;
-    options?: { temperature?: number };
+    keep_alive?: string | number;
+    options?: { temperature?: number; num_ctx?: number };
   }): Promise<{ message: { content: string } }>;
 }
+
+/**
+ * Runtime settings sent with every chat request so the API does not depend on
+ * the global configuration of the local Ollama server.
+ */
+export interface OllamaGenerationSettings {
+  /**
+   * Context window (`num_ctx`) in tokens. It must fit the system prompt, the
+   * Top-K sources and the generated JSON. Oversized windows reserve a huge KV
+   * cache (16 GiB for 128k tokens on `llama3.1:8b`) and slow down the host.
+   */
+  contextLength: number;
+  /**
+   * How long the model stays loaded after a request (`keep_alive`): a duration
+   * such as `"30m"`, or a number of seconds (`-1` keeps it loaded forever).
+   */
+  keepAlive: string | number;
+}
+
+/** A window of 8k tokens fits ~3.5k tokens of prompt plus the generated graph. */
+export const DEFAULT_OLLAMA_GENERATION_SETTINGS: OllamaGenerationSettings = {
+  contextLength: 8192,
+  keepAlive: '30m',
+};
 
 /**
  * Forces a local Ollama chat model to emit a strictly structured knowledge graph
@@ -64,13 +89,15 @@ export class OllamaStructuredGraphGenerator implements StructuredGraphGenerator 
   constructor(
     private readonly client: OllamaChatClient,
     private readonly model: string,
+    private readonly settings: OllamaGenerationSettings = DEFAULT_OLLAMA_GENERATION_SETTINGS,
   ) {}
 
   async generate(query: string, context: KnowledgeSearchMatch[]): Promise<GeneratedGraph> {
     const response = await this.client.chat({
       model: this.model,
       format: 'json',
-      options: { temperature: 0 },
+      keep_alive: this.settings.keepAlive,
+      options: { temperature: 0, num_ctx: this.settings.contextLength },
       messages: [
         { role: 'system', content: STRUCTURED_GRAPH_SYSTEM_PROMPT },
         { role: 'user', content: this.buildUserPrompt(query, context) },
@@ -171,15 +198,51 @@ function isEdge(value: unknown): value is KnowledgeGraphEdge {
 }
 
 /**
+ * Reads the generation settings from environment values, falling back to
+ * {@link DEFAULT_OLLAMA_GENERATION_SETTINGS}. Fails fast on invalid values so a
+ * misconfiguration is detected when the API boots, not on the first query.
+ */
+export function ollamaGenerationSettingsFromEnv(env: {
+  contextLength?: string | undefined;
+  keepAlive?: string | undefined;
+}): OllamaGenerationSettings {
+  return {
+    contextLength: parseContextLength(env.contextLength),
+    keepAlive: parseKeepAlive(env.keepAlive),
+  };
+}
+
+function parseContextLength(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') {
+    return DEFAULT_OLLAMA_GENERATION_SETTINGS.contextLength;
+  }
+  const contextLength = Number(value);
+  if (!Number.isInteger(contextLength) || contextLength <= 0) {
+    throw new Error(`Invalid Ollama context length "${value}": expected a positive integer`);
+  }
+  return contextLength;
+}
+
+function parseKeepAlive(value: string | undefined): string | number {
+  const keepAlive = value?.trim();
+  if (keepAlive === undefined || keepAlive === '') {
+    return DEFAULT_OLLAMA_GENERATION_SETTINGS.keepAlive;
+  }
+  // Ollama reads bare numbers as seconds, but only when they are sent as JSON numbers.
+  return /^-?\d+$/.test(keepAlive) ? Number(keepAlive) : keepAlive;
+}
+
+/**
  * Builds a production generator from environment settings.
  */
 export function createOllamaStructuredGraphGenerator(
   url: string,
   model: string,
+  settings: OllamaGenerationSettings = DEFAULT_OLLAMA_GENERATION_SETTINGS,
 ): OllamaStructuredGraphGenerator {
   const ollama = new Ollama({ host: url });
   const client: OllamaChatClient = {
     chat: (request) => ollama.chat({ ...request, stream: false }),
   };
-  return new OllamaStructuredGraphGenerator(client, model);
+  return new OllamaStructuredGraphGenerator(client, model, settings);
 }

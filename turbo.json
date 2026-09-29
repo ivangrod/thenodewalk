@@ -1,6 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["CHROMA_URL", "OLLAMA_URL", "OLLAMA_EMBEDDING_MODEL", "OLLAMA_LLM_MODEL"],
+  "globalEnv": [
+    "CHROMA_URL",
+    "OLLAMA_URL",
+    "OLLAMA_EMBEDDING_MODEL",
+    "OLLAMA_LLM_MODEL",
+    "OLLAMA_LLM_CONTEXT_LENGTH",
+    "OLLAMA_LLM_KEEP_ALIVE"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

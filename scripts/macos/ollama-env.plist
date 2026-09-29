@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.thenodewalk.ollama-env</string>
+  <!--
+    Sets Ollama server environment variables for the GUI login session, so they survive
+    reboots and Ollama.app updates. See docs/rag/operations-and-verification.md.
+
+    - OLLAMA_FLASH_ATTENTION: faster prompt evaluation and a smaller KV cache.
+    - OLLAMA_KV_CACHE_TYPE:   quantized KV cache (q8_0), roughly halves its memory use.
+    - OLLAMA_KEEP_ALIVE:      keeps a model loaded for 30 minutes after a request instead
+                              of the 5-minute default, avoiding repeated cold-load latency.
+
+    Quit and reopen Ollama.app after installing this LaunchAgent for it to take effect.
+  -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>/bin/launchctl setenv OLLAMA_FLASH_ATTENTION 1; /bin/launchctl setenv OLLAMA_KV_CACHE_TYPE q8_0; /bin/launchctl setenv OLLAMA_KEEP_ALIVE 30m</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
