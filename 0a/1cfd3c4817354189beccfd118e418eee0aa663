@@ -1,0 +1,37 @@
+apps/api/src/knowledge/application/answer-technical-query.query.spec.ts
+  s_9f1a44491b900e::t_f3c48026fa0b8a 60-91
+apps/api/src/knowledge/domain/knowledge-graph.ts
+  s_9f1a44491b900e::t_0065c7e2c3cd45 9-10
+apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.spec.ts
+  s_9f1a44491b900e::t_77178739091ea3 84,88,101-125
+apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts
+  s_9f1a44491b900e::t_4189bc4ca217f0 21,29,37-38,94,136,144,148-152
+apps/web/e2e/technical-query.spec.ts
+  s_9f1a44491b900e::t_38305dc8d489e9 13,67-84
+apps/web/src/features/technical-query/presentation/components/ConceptNode.tsx
+  s_9f1a44491b900e::t_46792a506e4aa1 10-11,16-20,22-24,29-30,35-57
+apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.test.tsx
+  s_9f1a44491b900e::t_c0402594bd33f7 1,8,52-77
+docs/frontend/technical-query-knowledge-graph.md
+  s_9f1a44491b900e::t_2d8b2b1896ad75 16-21,64,72-94,121-128
+docs/rag/local-pipeline.md
+  s_9f1a44491b900e::t_6a5ce1379def66 33-35
+packages/contracts/src/index.ts
+  s_9f1a44491b900e::t_2630be18356df0 10-13,18,34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0a1cfd3c4817354189beccfd118e418eee0aa663",
+  "prompts": {},
+  "sessions": {
+    "s_9f1a44491b900e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1321a07affeGTKEJKdocRd0sN",
+        "model": "claude-opus-5.5"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
