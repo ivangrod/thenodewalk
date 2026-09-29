@@ -92,6 +92,39 @@ describe('POST /technical-queries (integration)', () => {
     });
   });
 
+  it('links each source to at most one node', async () => {
+    const sourceUrl = 'https://netflixtechblog.com/gateway';
+    repository.matches = [
+      { chunk: KnowledgeChunkMother.create({ articleUrl: sourceUrl }), score: 0.9 },
+    ];
+    generator.result = {
+      summary: 'Netflix routes traffic through a gateway.',
+      graph: {
+        nodes: [
+          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
+          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl },
+        ],
+        edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
+      },
+    };
+
+    const response = await request(app.getHttpServer())
+      .post('/technical-queries')
+      .send({ query: 'How does Netflix route traffic?' })
+      .expect(201);
+
+    expect(response.body).toEqual({
+      summary: 'Netflix routes traffic through a gateway.',
+      graph: {
+        nodes: [
+          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
+          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null },
+        ],
+        edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
+      },
+    });
+  });
+
   it('rejects an empty query body with 400', async () => {
     await request(app.getHttpServer()).post('/technical-queries').send({ query: '' }).expect(400);
   });

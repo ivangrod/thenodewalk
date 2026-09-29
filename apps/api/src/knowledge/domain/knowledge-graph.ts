@@ -31,3 +31,33 @@ export interface GeneratedGraph {
 }
 
 export const EMPTY_GRAPH: KnowledgeGraph = { nodes: [], edges: [] };
+
+/**
+ * Enforces the source invariants of a knowledge graph:
+ * - A node can only be linked to a post that was retrieved as context.
+ * - A post is linked to at most one node: the first node (in graph order) that
+ *   references it keeps it.
+ *
+ * Any other source is cleared (`sourceUrl: null`). Nodes and edges are always
+ * preserved, so the graph structure never changes.
+ */
+export function assignUniqueSources(
+  graph: KnowledgeGraph,
+  retrievedSourceUrls: ReadonlySet<string>,
+): KnowledgeGraph {
+  const linkedSourceUrls = new Set<string>();
+
+  const nodes = graph.nodes.map((node): KnowledgeGraphNode => {
+    const { sourceUrl } = node;
+    if (sourceUrl === null) {
+      return node;
+    }
+    if (!retrievedSourceUrls.has(sourceUrl) || linkedSourceUrls.has(sourceUrl)) {
+      return { ...node, sourceUrl: null };
+    }
+    linkedSourceUrls.add(sourceUrl);
+    return node;
+  });
+
+  return { nodes, edges: graph.edges };
+}

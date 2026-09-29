@@ -4,7 +4,7 @@ import {
   StubEmbeddingGenerator,
   StubStructuredGraphGenerator,
 } from './testing/knowledge-test-doubles';
-import { KnowledgeChunkMother } from '../domain/testing/knowledge.mother';
+import { KnowledgeChunkMother, KnowledgeGraphNodeMother } from '../domain/testing/knowledge.mother';
 import type { KnowledgeSearchMatch } from '../domain/knowledge-chunk-repository';
 import type { GeneratedGraph } from '../domain/knowledge-graph';
 
@@ -87,6 +87,59 @@ describe('AnswerTechnicalQueryQuery', () => {
       { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
     ]);
     expect(response.graph.edges).toHaveLength(1);
+  });
+
+  it('never returns two nodes linked to the same source', async () => {
+    const sharedUrl = 'https://blog.test/kafka';
+    const { query, generator } = buildQuery([matchWith(sharedUrl), matchWith(sharedUrl)]);
+    generator.result = {
+      summary: 'Kafka stores records in partitioned topics.',
+      graph: {
+        nodes: [
+          KnowledgeGraphNodeMother.create({ id: 'kafka', sourceUrl: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'topic', sourceUrl: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'partition', sourceUrl: sharedUrl }),
+        ],
+        edges: [
+          { source: 'kafka', target: 'topic', relationship: 'organizes' },
+          { source: 'topic', target: 'partition', relationship: 'splits into' },
+        ],
+      },
+    };
+
+    const response = await query.execute('How does Kafka store data?');
+
+    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
+      ['kafka', sharedUrl],
+      ['topic', null],
+      ['partition', null],
+    ]);
+    expect(response.graph.edges).toHaveLength(2);
+  });
+
+  it('clears sources that are not among the retrieved chunks', async () => {
+    const retrievedUrl = 'https://blog.test/retrieved';
+    const { query, generator } = buildQuery([matchWith(retrievedUrl)]);
+    generator.result = {
+      summary: 'A summary.',
+      graph: {
+        nodes: [
+          KnowledgeGraphNodeMother.create({ id: 'grounded', sourceUrl: retrievedUrl }),
+          KnowledgeGraphNodeMother.create({
+            id: 'invented',
+            sourceUrl: 'https://blog.test/hallucinated',
+          }),
+        ],
+        edges: [],
+      },
+    };
+
+    const response = await query.execute('a question');
+
+    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
+      ['grounded', retrievedUrl],
+      ['invented', null],
+    ]);
   });
 
   it('returns an empty graph and an explanatory summary when nothing is retrieved', async () => {

@@ -18,7 +18,7 @@ export class InvalidStructuredGraphError extends Error {
 }
 
 /** Versioned system prompt. Bump the version when the contract or rules change. */
-export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v2';
+export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v3';
 
 export const STRUCTURED_GRAPH_SYSTEM_PROMPT = `You are a senior software architect. Using ONLY the provided sources, answer the question as an interactive knowledge graph.
 Respond with a single JSON object and nothing else, matching exactly this schema:
@@ -36,6 +36,7 @@ Respond with a single JSON object and nothing else, matching exactly this schema
 Rules:
 - A node "sourceUrl" MUST be one of the provided source URLs, or null.
 - Use null as "sourceUrl" when no provided source supports the concept.
+- Each source URL can be linked to at most one node; use null as "sourceUrl" for the other nodes supported by the same source.
 - Every edge "source" and "target" MUST reference an existing node "id".
 - "type" is always the literal "concept".
 - Do not invent facts that are not supported by the sources.

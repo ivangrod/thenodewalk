@@ -32,6 +32,12 @@ fully local:
    `completed` with its article and chunk totals, or `failed` with its reason) through the
    `IngestionProgressReporter` domain port, implemented by a Nest `Logger` adapter. Progress is
    not a state change, so it must not be modelled as domain events.
+10. Within a single graph, a post is linked to at most one node, and a node can only be linked
+    to a post retrieved as context. `AnswerTechnicalQueryQuery` enforces it with the pure
+    domain function `assignUniqueSources`: the first node (in graph order) that references a
+    retrieved post keeps it, and any duplicate or non-retrieved source becomes `null`. Nodes
+    and edges are never dropped by this rule. The system prompt asks the LLM for the same
+    rule, but the domain function is the source of truth.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
@@ -46,6 +52,7 @@ normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node
 - Allows ChromaDB and Ollama adapters to be replaced or tested with hand-written doubles.
 - Prevents Nest dependency-injection failures that only appear when the full API boots.
 - Constrains unreliable LLM output before it crosses the API boundary.
+- Guarantees that every post appears once per graph and that no node links an invented source.
 - Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
   `DefaultEmbeddingFunction` warnings in the API logs.
 - Makes long ingestion runs observable feed by feed without polluting the domain event stream.
@@ -92,11 +99,23 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
   }
 
   try {
-    return this.toResponse(await this.graphGenerator.generate(query, matches));
+    const generated = await this.graphGenerator.generate(query, matches);
+    const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
+    return this.toResponse({
+      summary: generated.summary,
+      graph: assignUniqueSources(generated.graph, retrievedSourceUrls),
+    });
   } catch {
     return { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH };
   }
 }
+```
+
+### ❌ Bad: Trusting the LLM to keep sources unique and grounded
+
+```typescript
+// Two nodes may link the same post, or a node may link a URL that was never retrieved.
+return this.toResponse(await this.graphGenerator.generate(query, matches));
 ```
 
 ### ✅ Good: Explicit factory for adapters with local defaults
@@ -185,6 +204,7 @@ export class RssArticleFeedReader {
 - Ingestion Command: `apps/api/src/knowledge/application/ingest-feeds.command.ts`
 - Read-only RAG Query: `apps/api/src/knowledge/application/answer-technical-query.query.ts`
 - Deterministic chunks and repository port: `apps/api/src/knowledge/domain/knowledge-chunk.ts` and `apps/api/src/knowledge/domain/knowledge-chunk-repository.ts`
+- Unique, grounded node sources: `assignUniqueSources` in `apps/api/src/knowledge/domain/knowledge-graph.ts`
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
 - Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`

@@ -7,6 +7,7 @@ import {
   type KnowledgeChunk,
   type KnowledgeChunkMetadata,
 } from '../knowledge-chunk';
+import type { KnowledgeGraphNode } from '../knowledge-graph';
 
 export class FeedSubscriptionMother {
   static create(params?: Partial<FeedSubscription>): FeedSubscription {
@@ -52,5 +53,17 @@ export class KnowledgeChunkMother {
       embedding: embedding ?? [faker.number.float(), faker.number.float()],
       metadata: KnowledgeChunkMetadataMother.create(metadata),
     });
+  }
+}
+
+export class KnowledgeGraphNodeMother {
+  static create(params?: Partial<KnowledgeGraphNode>): KnowledgeGraphNode {
+    return {
+      id: faker.string.uuid(),
+      label: faker.lorem.words(2),
+      type: 'concept',
+      sourceUrl: faker.internet.url(),
+      ...params,
+    };
   }
 }
