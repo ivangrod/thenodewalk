@@ -5,7 +5,7 @@ import type { KnowledgeGraph, TechnicalQueryResponse } from '@thenodewalk/contra
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
 import type { GeneratedGraph } from '../domain/knowledge-graph';
-import { EMPTY_GRAPH } from '../domain/knowledge-graph';
+import { assignUniqueSources, EMPTY_GRAPH } from '../domain/knowledge-graph';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
 import {
   EMBEDDING_GENERATOR,
@@ -25,7 +25,9 @@ const GENERATION_FAILURE_SUMMARY =
  * Read-only query (CQRS) that answers a technical question with a summary and a
  * structured knowledge graph. It embeds the question once, retrieves the Top-K
  * chunks and asks the {@link StructuredGraphGenerator} to reason over that
- * traceable context. No state is mutated and no domain events are emitted.
+ * traceable context. The generated graph is then constrained so each node can
+ * only link a retrieved post, and each post is linked to at most one node.
+ * No state is mutated and no domain events are emitted.
  */
 @Injectable()
 export class AnswerTechnicalQueryQuery {
@@ -50,7 +52,11 @@ export class AnswerTechnicalQueryQuery {
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
-      return this.toResponse(generated);
+      const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
+      return this.toResponse({
+        summary: generated.summary,
+        graph: assignUniqueSources(generated.graph, retrievedSourceUrls),
+      });
     } catch (error) {
       this.logger.warn(
         `Structured graph generation failed: ${error instanceof Error ? error.message : String(error)}`,
