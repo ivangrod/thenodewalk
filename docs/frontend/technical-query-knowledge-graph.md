@@ -19,6 +19,11 @@ keeps responsibilities separated:
 7. A node without a post (`sourceUrl: null`) is a `<button type="button">` that selects the
    concept on click and focus. It is never rendered as a link, and its accessible name is
    `"{label}, no linked source"`.
+8. The central node (`graph.centralNodeId`) holds the main idea of the graph. The canvas places
+   it in the middle and the remaining concepts on a circle around it. It is emphasized with a
+   visible `Main idea` text (never by colour alone) and its accessible name includes it:
+   `"{label}, main idea, open source in a new tab"` or `"{label}, main idea, no linked source"`.
+   Without a known central node, every concept is placed on the circle.
 
 The graph canvas is an enhancement for the structured response. The summary and query-state
 messages remain readable regardless of whether the graph has nodes.
@@ -126,6 +131,26 @@ This provides neither a semantic link nor an accessible name or guaranteed keybo
 
 A concept without a post must not pretend to be a link: use the selectable button instead.
 
+### ✅ Good: Central node identified by text, not only by colour
+
+```tsx
+<a aria-label={`${data.label}, main idea, open source in a new tab`} href={data.sourceUrl}>
+  <span className="block text-xs font-semibold uppercase tracking-wide">Main idea</span>
+  {data.label}
+</a>
+```
+
+### ❌ Bad: Central node identified by colour alone
+
+```tsx
+<a className={isCentral ? 'bg-amber-300' : 'bg-card'} href={data.sourceUrl}>
+  {data.label}
+</a>
+```
+
+Colour-only emphasis is invisible to screen-reader users and to users with colour-vision
+deficiencies.
+
 ## Real world examples
 
 - Request adapter: `apps/web/src/features/technical-query/infrastructure/technical-query.client.ts`
@@ -133,6 +158,7 @@ A concept without a post must not pretend to be a link: use the selectable butto
 - Interactive-only Zustand store: `apps/web/src/features/technical-query/presentation/stores/useSelectedConceptStore.ts`
 - Lazy React Flow boundary: `apps/web/src/features/technical-query/presentation/components/KnowledgeGraph.tsx`
 - Accessible graph node: `apps/web/src/features/technical-query/presentation/components/ConceptNode.tsx`
+- Central node layout: `apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.tsx`
 - State rendering and retry affordance: `apps/web/src/features/technical-query/presentation/components/TechnicalQueryView.tsx`
 
 ## Related agreements

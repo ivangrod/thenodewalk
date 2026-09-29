@@ -7,6 +7,7 @@ import type {
   KnowledgeGraphEdge,
   KnowledgeGraphNode,
 } from '../../domain/knowledge-graph';
+import { MAX_GRAPH_DEPTH } from '../../domain/knowledge-graph-focus';
 import type { StructuredGraphGenerator } from '../../domain/structured-graph-generator';
 
 /** Raised when the LLM output cannot be parsed into a valid graph. */
@@ -18,7 +19,7 @@ export class InvalidStructuredGraphError extends Error {
 }
 
 /** Versioned system prompt. Bump the version when the contract or rules change. */
-export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v3';
+export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v4';
 
 export const STRUCTURED_GRAPH_SYSTEM_PROMPT = `You are a senior software architect. Using ONLY the provided sources, answer the question as an interactive knowledge graph.
 Respond with a single JSON object and nothing else, matching exactly this schema:
@@ -30,7 +31,8 @@ Respond with a single JSON object and nothing else, matching exactly this schema
     ],
     "edges": [                     // semantic relationships between node ids
       { "source": string, "target": string, "relationship": string }
-    ]
+    ],
+    "centralNodeId": string        // id of the node holding the main idea
   }
 }
 Rules:
@@ -38,6 +40,8 @@ Rules:
 - Use null as "sourceUrl" when no provided source supports the concept.
 - Each source URL can be linked to at most one node; use null as "sourceUrl" for the other nodes supported by the same source.
 - Every edge "source" and "target" MUST reference an existing node "id".
+- "centralNodeId" MUST be the id of the node holding the main idea of the most relevant source (Source 1).
+- Every node MUST be reachable from the central node through at most ${MAX_GRAPH_DEPTH} edges.
 - "type" is always the literal "concept".
 - Do not invent facts that are not supported by the sources.
 - Output valid JSON only, no markdown fences, no comments.`;
@@ -92,7 +96,8 @@ export class OllamaStructuredGraphGenerator implements StructuredGraphGenerator 
  * Parses and validates the raw LLM JSON into a {@link GeneratedGraph}. Throws
  * {@link InvalidStructuredGraphError} when the top-level shape is wrong, and
  * repairs the graph by dropping malformed nodes/edges and edges that reference
- * unknown nodes. Nodes without a usable source are kept with `sourceUrl: null`.
+ * unknown nodes. Nodes without a usable source are kept with `sourceUrl: null`,
+ * and a missing or blank central node is returned as `centralNodeId: null`.
  */
 export function parseGeneratedGraph(raw: string): GeneratedGraph {
   let parsed: unknown;
@@ -125,7 +130,12 @@ export function parseGeneratedGraph(raw: string): GeneratedGraph {
     .filter(isEdge)
     .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
 
-  const graph: KnowledgeGraph = { nodes, edges };
+  const graph: KnowledgeGraph = {
+    nodes,
+    edges,
+    // Whether it references an existing node is resolved by the domain (`resolveCentralNodeId`).
+    centralNodeId: nonBlankStringOrNull(graphValue.centralNodeId),
+  };
   return { summary: parsed.summary, graph };
 }
 
@@ -142,12 +152,12 @@ function normalizeNode(value: Record<string, unknown>): KnowledgeGraphNode {
     id: value.id as string,
     label: value.label as string,
     type: 'concept',
-    sourceUrl: normalizeSourceUrl(value.sourceUrl),
+    // A missing, empty or non-string source means the concept has no linked post.
+    sourceUrl: nonBlankStringOrNull(value.sourceUrl),
   };
 }
 
-/** A missing, empty or non-string source means the concept has no linked post. */
-function normalizeSourceUrl(value: unknown): string | null {
+function nonBlankStringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 

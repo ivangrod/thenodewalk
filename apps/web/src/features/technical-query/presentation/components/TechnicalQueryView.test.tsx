@@ -40,6 +40,7 @@ const RESPONSE: TechnicalQueryResponse = {
       },
     ],
     edges: [],
+    centralNodeId: 'gateway',
   },
 };
 
@@ -74,7 +75,7 @@ describe('TechnicalQueryView', () => {
   it('renders a no-results message when the graph is empty', () => {
     setHook({
       status: 'success',
-      data: { summary: '', graph: { nodes: [], edges: [] } },
+      data: { summary: '', graph: { nodes: [], edges: [], centralNodeId: null } },
       lastQuery: 'unknown',
     });
     render(<TechnicalQueryView />);

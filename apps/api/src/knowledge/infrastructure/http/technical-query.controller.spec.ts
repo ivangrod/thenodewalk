@@ -9,7 +9,10 @@ import { TechnicalQueryController } from './technical-query.controller';
 
 class StubAnswerTechnicalQueryQuery {
   lastQuery?: string;
-  response: TechnicalQueryResponse = { summary: '', graph: { nodes: [], edges: [] } };
+  response: TechnicalQueryResponse = {
+    summary: '',
+    graph: { nodes: [], edges: [], centralNodeId: null },
+  };
 
   execute(query: string): Promise<TechnicalQueryResponse> {
     this.lastQuery = query;
@@ -32,6 +35,7 @@ describe('TechnicalQueryController', () => {
           },
         ],
         edges: [],
+        centralNodeId: 'gateway',
       },
     };
     const controller = new TechnicalQueryController(stub as unknown as AnswerTechnicalQueryQuery);

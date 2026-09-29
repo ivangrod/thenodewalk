@@ -7,7 +7,7 @@ import {
   type KnowledgeChunk,
   type KnowledgeChunkMetadata,
 } from '../knowledge-chunk';
-import type { KnowledgeGraphNode } from '../knowledge-graph';
+import type { KnowledgeGraphEdge, KnowledgeGraphNode } from '../knowledge-graph';
 
 export class FeedSubscriptionMother {
   static create(params?: Partial<FeedSubscription>): FeedSubscription {
@@ -65,5 +65,21 @@ export class KnowledgeGraphNodeMother {
       sourceUrl: faker.internet.url(),
       ...params,
     };
+  }
+}
+
+export class KnowledgeGraphEdgeMother {
+  static create(params?: Partial<KnowledgeGraphEdge>): KnowledgeGraphEdge {
+    return {
+      source: faker.string.uuid(),
+      target: faker.string.uuid(),
+      relationship: faker.lorem.words(2),
+      ...params,
+    };
+  }
+
+  /** Edge linking two existing nodes. */
+  static between(source: KnowledgeGraphNode, target: KnowledgeGraphNode): KnowledgeGraphEdge {
+    return KnowledgeGraphEdgeMother.create({ source: source.id, target: target.id });
   }
 }

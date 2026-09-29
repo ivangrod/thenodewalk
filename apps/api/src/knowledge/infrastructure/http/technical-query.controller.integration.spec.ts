@@ -65,6 +65,7 @@ describe('POST /technical-queries (integration)', () => {
           },
         ],
         edges: [],
+        centralNodeId: 'gateway',
       },
     };
 
@@ -88,6 +89,7 @@ describe('POST /technical-queries (integration)', () => {
           },
         ],
         edges: [],
+        centralNodeId: 'gateway',
       },
     });
   });
@@ -105,6 +107,7 @@ describe('POST /technical-queries (integration)', () => {
           { id: 'routing', label: 'Routing', type: 'concept', sourceUrl },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
+        centralNodeId: 'gateway',
       },
     };
 
@@ -121,6 +124,7 @@ describe('POST /technical-queries (integration)', () => {
           { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
+        centralNodeId: 'gateway',
       },
     });
   });

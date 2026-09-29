@@ -24,9 +24,15 @@ export interface KnowledgeGraphEdge {
   relationship: string;
 }
 
+/**
+ * `centralNodeId` is the node holding the main idea (post) of the graph. Every
+ * other node is at most 3 levels away from it. It is `null` only when the graph
+ * has no nodes.
+ */
 export interface KnowledgeGraph {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
+  centralNodeId: string | null;
 }
 
 /**

@@ -11,19 +11,32 @@ import { ConceptNode, type ConceptFlowNode } from './ConceptNode';
 
 const nodeTypes = { concept: ConceptNode };
 const LAYOUT_RADIUS = 220;
+const LAYOUT_CENTRE = { x: LAYOUT_RADIUS, y: LAYOUT_RADIUS };
 
+function ringPosition(index: number, total: number): { x: number; y: number } {
+  const angle = (2 * Math.PI * index) / Math.max(1, total);
+  return {
+    x: LAYOUT_CENTRE.x + Math.cos(angle) * LAYOUT_RADIUS,
+    y: LAYOUT_CENTRE.y + Math.sin(angle) * LAYOUT_RADIUS,
+  };
+}
+
+/**
+ * Places the central node (the main idea) in the middle of the canvas and the
+ * remaining concepts evenly on a circle around it. Without a known central node,
+ * every concept is placed on the circle.
+ */
 function toFlowNodes(graph: KnowledgeGraph): ConceptFlowNode[] {
-  const total = Math.max(1, graph.nodes.length);
-  return graph.nodes.map((node, index) => {
-    const angle = (2 * Math.PI * index) / total;
+  const centralNode = graph.nodes.find((node) => node.id === graph.centralNodeId);
+  const ringNodes = graph.nodes.filter((node) => node !== centralNode);
+
+  return graph.nodes.map((node) => {
+    const isCentral = node === centralNode;
     return {
       id: node.id,
       type: 'concept',
-      position: {
-        x: LAYOUT_RADIUS + Math.cos(angle) * LAYOUT_RADIUS,
-        y: LAYOUT_RADIUS + Math.sin(angle) * LAYOUT_RADIUS,
-      },
-      data: { label: node.label, sourceUrl: node.sourceUrl },
+      position: isCentral ? LAYOUT_CENTRE : ringPosition(ringNodes.indexOf(node), ringNodes.length),
+      data: { label: node.label, sourceUrl: node.sourceUrl, isCentral },
     };
   });
 }

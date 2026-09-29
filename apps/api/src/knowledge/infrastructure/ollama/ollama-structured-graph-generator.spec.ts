@@ -32,6 +32,7 @@ const VALID_JSON = JSON.stringify({
       { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/kafka' },
     ],
     edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
+    centralNodeId: 'kafka',
   },
 });
 
@@ -133,5 +134,21 @@ describe('parseGeneratedGraph', () => {
     });
 
     expect(parseGeneratedGraph(raw).graph.nodes[0]?.type).toBe('concept');
+  });
+
+  it('parses the central node id proposed by the model', () => {
+    expect(parseGeneratedGraph(VALID_JSON).graph.centralNodeId).toBe('kafka');
+  });
+
+  it('returns a null central node id when the model omits it', () => {
+    const raw = JSON.stringify({
+      summary: 's',
+      graph: {
+        nodes: [{ id: 'a', label: 'A', type: 'concept', sourceUrl: 'https://blog.test/a' }],
+        edges: [],
+      },
+    });
+
+    expect(parseGeneratedGraph(raw).graph.centralNodeId).toBeNull();
   });
 });

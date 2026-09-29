@@ -12,6 +12,7 @@ describe('assignUniqueSources', () => {
         KnowledgeGraphNodeMother.create({ sourceUrl: secondUrl }),
       ],
       edges: [],
+      centralNodeId: null,
     };
 
     const result = assignUniqueSources(graph, new Set([firstUrl, secondUrl]));
@@ -28,6 +29,7 @@ describe('assignUniqueSources', () => {
         KnowledgeGraphNodeMother.create({ id: 'third', sourceUrl: sharedUrl }),
       ],
       edges: [],
+      centralNodeId: null,
     };
 
     const result = assignUniqueSources(graph, new Set([sharedUrl]));
@@ -47,6 +49,7 @@ describe('assignUniqueSources', () => {
         KnowledgeGraphNodeMother.create({ sourceUrl: retrievedUrl }),
       ],
       edges: [],
+      centralNodeId: null,
     };
 
     const result = assignUniqueSources(graph, new Set([retrievedUrl]));
@@ -60,6 +63,7 @@ describe('assignUniqueSources', () => {
     const graph: KnowledgeGraph = {
       nodes: [withoutSource, KnowledgeGraphNodeMother.create({ sourceUrl: retrievedUrl })],
       edges: [],
+      centralNodeId: null,
     };
 
     const result = assignUniqueSources(graph, new Set([retrievedUrl]));
@@ -68,7 +72,7 @@ describe('assignUniqueSources', () => {
     expect(result.nodes[1]?.sourceUrl).toBe(retrievedUrl);
   });
 
-  it('preserves every node and edge', () => {
+  it('preserves every node, edge and the central node', () => {
     const sharedUrl = faker.internet.url();
     const first = KnowledgeGraphNodeMother.create({ sourceUrl: sharedUrl });
     const second = KnowledgeGraphNodeMother.create({ sourceUrl: sharedUrl });
@@ -79,6 +83,7 @@ describe('assignUniqueSources', () => {
         { source: first.id, target: second.id, relationship: 'relates to' },
         { source: second.id, target: unknown.id, relationship: 'depends on' },
       ],
+      centralNodeId: first.id,
     };
 
     const result = assignUniqueSources(graph, new Set([sharedUrl]));
@@ -87,5 +92,6 @@ describe('assignUniqueSources', () => {
       graph.nodes.map(({ id, label, type }) => ({ id, label, type })),
     );
     expect(result.edges).toEqual(graph.edges);
+    expect(result.centralNodeId).toBe(first.id);
   });
 });
