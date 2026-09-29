@@ -57,6 +57,38 @@ describe('AnswerTechnicalQueryQuery', () => {
     expect(response.graph.edges).toHaveLength(1);
   });
 
+  it('returns nodes without a source with a null sourceUrl', async () => {
+    const { query, generator } = buildQuery([matchWith('https://blog.test/post')]);
+    generator.result = {
+      summary: 'Event sourcing stores changes as events.',
+      graph: {
+        nodes: [
+          {
+            id: 'event-sourcing',
+            label: 'Event Sourcing',
+            type: 'concept',
+            sourceUrl: 'https://blog.test/post',
+          },
+          { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+        ],
+        edges: [{ source: 'event-sourcing', target: 'event', relationship: 'stores' }],
+      },
+    };
+
+    const response = await query.execute('What is event sourcing?');
+
+    expect(response.graph.nodes).toEqual([
+      {
+        id: 'event-sourcing',
+        label: 'Event Sourcing',
+        type: 'concept',
+        sourceUrl: 'https://blog.test/post',
+      },
+      { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+    ]);
+    expect(response.graph.edges).toHaveLength(1);
+  });
+
   it('returns an empty graph and an explanatory summary when nothing is retrieved', async () => {
     const { query, generator } = buildQuery([]);
 

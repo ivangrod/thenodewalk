@@ -10,7 +10,7 @@ const RESPONSE: TechnicalQueryResponse = {
   graph: {
     nodes: [
       { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl: SOURCE_URL },
-      { id: 'services', label: 'Microservices', type: 'concept', sourceUrl: SOURCE_URL },
+      { id: 'services', label: 'Microservices', type: 'concept', sourceUrl: null },
     ],
     edges: [{ source: 'gateway', target: 'services', relationship: 'routes to' }],
   },
@@ -62,6 +62,24 @@ test.describe('technical query flow', () => {
     await popup.waitForLoadState();
     expect(popup.url()).toBe(SOURCE_URL);
     await popup.close();
+  });
+
+  test('renders a concept without a source as a selectable, non-link button', async ({ page }) => {
+    await page.goto('/ask');
+
+    await page
+      .getByRole('searchbox', { name: /ask a technical question/i })
+      .fill('How does Netflix scale its API?');
+    await page.getByRole('button', { name: /search/i }).click();
+    await expect(page.getByText(/federated api gateway/i)).toBeVisible();
+
+    await expect(page.getByRole('link', { name: /microservices/i })).toHaveCount(0);
+
+    const conceptButton = page.getByRole('button', { name: /microservices, no linked source/i });
+    await expect(conceptButton).toBeVisible();
+    await conceptButton.focus();
+    await expect(conceptButton).toBeFocused();
+    await expect(conceptButton).toHaveClass(/bg-primary/);
   });
 
   test('the query flow has no critical or serious accessibility violations', async ({ page }) => {

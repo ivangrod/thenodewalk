@@ -7,11 +7,15 @@ export interface TechnicalQueryRequest {
   query: string;
 }
 
+/**
+ * A concept of the knowledge graph. `sourceUrl` is the post (ingested article)
+ * the concept is linked to, or `null` when the concept has no post.
+ */
 export interface KnowledgeGraphNode {
   id: string;
   label: string;
   type: 'concept';
-  sourceUrl: string;
+  sourceUrl: string | null;
 }
 
 export interface KnowledgeGraphEdge {
@@ -27,7 +31,7 @@ export interface KnowledgeGraph {
 
 /**
  * Final response for `POST /technical-queries`: a natural-language summary plus
- * an interactive knowledge graph whose nodes link back to their source URL.
+ * an interactive knowledge graph whose nodes may link back to their source URL.
  */
 export interface TechnicalQueryResponse {
   summary: string;

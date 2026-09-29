@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { KnowledgeGraph } from '@thenodewalk/contracts';
 
 import KnowledgeGraphCanvas from './KnowledgeGraphCanvas';
+import { useSelectedConceptStore } from '../stores/useSelectedConceptStore';
 
 interface MockReactFlowProps {
   nodes: { id: string; type: string; data: Record<string, unknown> }[];
@@ -47,5 +48,31 @@ describe('KnowledgeGraphCanvas', () => {
       'href',
       'https://blog.test/broker',
     );
+  });
+
+  it('renders a concept without a source as a focusable button that is not a link', () => {
+    const graph: KnowledgeGraph = {
+      nodes: [
+        {
+          id: 'kafka',
+          label: 'Apache Kafka',
+          type: 'concept',
+          sourceUrl: 'https://blog.test/kafka',
+        },
+        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
+      ],
+      edges: [{ source: 'kafka', target: 'partition', relationship: 'splits into' }],
+    };
+
+    render(<KnowledgeGraphCanvas graph={graph} />);
+
+    const partition = screen.getByRole('button', { name: /partition, no linked source/i });
+    expect(partition).toHaveAttribute('type', 'button');
+    expect(partition).not.toHaveAttribute('href');
+    act(() => partition.focus());
+    expect(partition).toHaveFocus();
+    expect(useSelectedConceptStore.getState().selectedNodeId).toBe('partition');
+    expect(screen.queryByRole('link', { name: /partition/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 });

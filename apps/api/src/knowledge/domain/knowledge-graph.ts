@@ -6,7 +6,8 @@ export interface KnowledgeGraphNode {
   id: string;
   label: string;
   type: 'concept';
-  sourceUrl: string;
+  /** URL of the post (ingested article) linked to the concept, or `null` when it has none. */
+  sourceUrl: string | null;
 }
 
 export interface KnowledgeGraphEdge {

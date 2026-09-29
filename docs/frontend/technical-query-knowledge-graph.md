@@ -13,9 +13,12 @@ keeps responsibilities separated:
 4. The view renders distinct idle, loading, recoverable-error, no-results, and success states.
 5. React Flow is a heavy browser-only dependency. It must remain behind a `next/dynamic`
    boundary with `ssr: false` and a lightweight loading skeleton.
-6. Every knowledge-graph node is a real anchor to its `sourceUrl`, not a clickable `div`. The
-   anchor has an accessible name that includes the concept label and source action, a visible
-   focus style, `target="_blank"`, and `rel="noreferrer noopener"`.
+6. A knowledge-graph node linked to a post is a real anchor to its `sourceUrl`, not a clickable
+   `div`. The anchor has an accessible name that includes the concept label and source action,
+   a visible focus style, `target="_blank"`, and `rel="noreferrer noopener"`.
+7. A node without a post (`sourceUrl: null`) is a `<button type="button">` that selects the
+   concept on click and focus. It is never rendered as a link, and its accessible name is
+   `"{label}, no linked source"`.
 
 The graph canvas is an enhancement for the structured response. The summary and query-state
 messages remain readable regardless of whether the graph has nodes.
@@ -58,7 +61,7 @@ export const useSelectedConceptStore = create<SelectedConceptState>((set) => ({
 }));
 ```
 
-### ✅ Good: Lazy graph boundary and accessible source link
+### ✅ Good: Lazy graph boundary and accessible concept node
 
 ```tsx
 const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
@@ -66,16 +69,29 @@ const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
   loading: () => <GraphSkeleton />,
 });
 
-<a
-  aria-label={`${data.label}, open source in a new tab`}
-  href={data.sourceUrl}
-  target="_blank"
-  rel="noreferrer noopener"
-  onFocus={() => select(id)}
-  className="focus-visible:outline-none"
->
-  {data.label}
-</a>;
+{
+  data.sourceUrl === null ? (
+    <button
+      aria-label={`${data.label}, no linked source`}
+      type="button"
+      onClick={() => select(id)}
+      onFocus={() => select(id)}
+    >
+      {data.label}
+    </button>
+  ) : (
+    <a
+      aria-label={`${data.label}, open source in a new tab`}
+      href={data.sourceUrl}
+      target="_blank"
+      rel="noreferrer noopener"
+      onFocus={() => select(id)}
+      className="focus-visible:outline-none"
+    >
+      {data.label}
+    </a>
+  );
+}
 ```
 
 ### ❌ Bad: Caching the response in Zustand and importing React Flow eagerly
@@ -101,6 +117,14 @@ const useGraphStore = create((set) => ({
 ```
 
 This provides neither a semantic link nor an accessible name or guaranteed keyboard behavior.
+
+### ❌ Bad: Linking a concept that has no post
+
+```tsx
+<a href={data.sourceUrl ?? '#'}>{data.label}</a>
+```
+
+A concept without a post must not pretend to be a link: use the selectable button instead.
 
 ## Real world examples
 
