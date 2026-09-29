@@ -4,8 +4,16 @@ import type { KnowledgeGraph, TechnicalQueryResponse } from '@thenodewalk/contra
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
-import type { GeneratedGraph } from '../domain/knowledge-graph';
+import type {
+  GeneratedGraph,
+  KnowledgeGraph as KnowledgeGraphModel,
+} from '../domain/knowledge-graph';
 import { assignUniqueSources, EMPTY_GRAPH } from '../domain/knowledge-graph';
+import {
+  limitGraphDepth,
+  MAX_GRAPH_DEPTH,
+  resolveCentralNodeId,
+} from '../domain/knowledge-graph-focus';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
 import {
   EMBEDDING_GENERATOR,
@@ -26,7 +34,9 @@ const GENERATION_FAILURE_SUMMARY =
  * structured knowledge graph. It embeds the question once, retrieves the Top-K
  * chunks and asks the {@link StructuredGraphGenerator} to reason over that
  * traceable context. The generated graph is then constrained so each node can
- * only link a retrieved post, and each post is linked to at most one node.
+ * only link a retrieved post, each post is linked to at most one node, and every
+ * node is at most {@link MAX_GRAPH_DEPTH} levels away from the central node (the
+ * node holding the main idea of the most relevant post).
  * No state is mutated and no domain events are emitted.
  */
 @Injectable()
@@ -46,16 +56,22 @@ export class AnswerTechnicalQueryQuery {
     const embedding = await this.embeddings.generate(query);
     const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
 
-    if (matches.length === 0) {
+    const [mainMatch] = matches;
+    if (!mainMatch) {
       return { summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH };
     }
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
       const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
+      const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+      const centred: KnowledgeGraphModel = {
+        ...sourced,
+        centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+      };
       return this.toResponse({
         summary: generated.summary,
-        graph: assignUniqueSources(generated.graph, retrievedSourceUrls),
+        graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
       });
     } catch (error) {
       this.logger.warn(
@@ -85,6 +101,7 @@ export class AnswerTechnicalQueryQuery {
         target: edge.target,
         relationship: edge.relationship,
       })),
+      centralNodeId: graph.centralNodeId,
     };
   }
 }

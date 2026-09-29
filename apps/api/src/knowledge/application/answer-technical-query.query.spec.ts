@@ -4,9 +4,14 @@ import {
   StubEmbeddingGenerator,
   StubStructuredGraphGenerator,
 } from './testing/knowledge-test-doubles';
-import { KnowledgeChunkMother, KnowledgeGraphNodeMother } from '../domain/testing/knowledge.mother';
+import {
+  KnowledgeChunkMother,
+  KnowledgeGraphEdgeMother,
+  KnowledgeGraphNodeMother,
+} from '../domain/testing/knowledge.mother';
 import type { KnowledgeSearchMatch } from '../domain/knowledge-chunk-repository';
-import type { GeneratedGraph } from '../domain/knowledge-graph';
+import type { GeneratedGraph, KnowledgeGraphNode } from '../domain/knowledge-graph';
+import { MAX_GRAPH_DEPTH } from '../domain/knowledge-graph-focus';
 
 function matchWith(articleUrl: string): KnowledgeSearchMatch {
   return { chunk: KnowledgeChunkMother.create({ articleUrl }), score: 0.9 };
@@ -43,6 +48,7 @@ describe('AnswerTechnicalQueryQuery', () => {
           },
         ],
         edges: [{ source: 'gateway', target: 'gateway', relationship: 'self' }],
+        centralNodeId: 'gateway',
       },
     };
     generator.result = generated;
@@ -72,6 +78,7 @@ describe('AnswerTechnicalQueryQuery', () => {
           { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
         ],
         edges: [{ source: 'event-sourcing', target: 'event', relationship: 'stores' }],
+        centralNodeId: 'event-sourcing',
       },
     };
 
@@ -104,6 +111,7 @@ describe('AnswerTechnicalQueryQuery', () => {
           { source: 'kafka', target: 'topic', relationship: 'organizes' },
           { source: 'topic', target: 'partition', relationship: 'splits into' },
         ],
+        centralNodeId: 'kafka',
       },
     };
 
@@ -130,7 +138,8 @@ describe('AnswerTechnicalQueryQuery', () => {
             sourceUrl: 'https://blog.test/hallucinated',
           }),
         ],
-        edges: [],
+        edges: [KnowledgeGraphEdgeMother.create({ source: 'grounded', target: 'invented' })],
+        centralNodeId: 'grounded',
       },
     };
 
@@ -142,12 +151,62 @@ describe('AnswerTechnicalQueryQuery', () => {
     ]);
   });
 
+  it('returns the graph limited to 3 levels from the central node', async () => {
+    const { query, generator } = buildQuery([matchWith('https://blog.test/main')]);
+    const chain = Array.from({ length: MAX_GRAPH_DEPTH + 3 }, () =>
+      KnowledgeGraphNodeMother.create({ sourceUrl: null }),
+    );
+    const central = chain[0] as KnowledgeGraphNode;
+    const disconnected = KnowledgeGraphNodeMother.create({ sourceUrl: null });
+    generator.result = {
+      summary: 'A deep graph.',
+      graph: {
+        nodes: [...chain, disconnected],
+        edges: chain
+          .slice(1)
+          .map((node, index) =>
+            KnowledgeGraphEdgeMother.between(chain[index] as KnowledgeGraphNode, node),
+          ),
+        centralNodeId: central.id,
+      },
+    };
+
+    const response = await query.execute('a deep question');
+
+    expect(response.graph.centralNodeId).toBe(central.id);
+    expect(response.graph.nodes.map((node) => node.id)).toEqual(
+      chain.slice(0, MAX_GRAPH_DEPTH + 1).map((node) => node.id),
+    );
+    expect(response.graph.edges).toHaveLength(MAX_GRAPH_DEPTH);
+  });
+
+  it('uses the node linked to the most relevant post as central node when the generator does not provide a valid one', async () => {
+    const mainPostUrl = 'https://blog.test/main';
+    const secondaryUrl = 'https://blog.test/secondary';
+    const { query, generator } = buildQuery([matchWith(mainPostUrl), matchWith(secondaryUrl)]);
+    const secondary = KnowledgeGraphNodeMother.create({ sourceUrl: secondaryUrl });
+    const mainIdea = KnowledgeGraphNodeMother.create({ sourceUrl: mainPostUrl });
+    generator.result = {
+      summary: 'A summary.',
+      graph: {
+        nodes: [secondary, mainIdea],
+        edges: [KnowledgeGraphEdgeMother.between(mainIdea, secondary)],
+        centralNodeId: 'not-a-node',
+      },
+    };
+
+    const response = await query.execute('a question');
+
+    expect(response.graph.centralNodeId).toBe(mainIdea.id);
+    expect(response.graph.nodes).toHaveLength(2);
+  });
+
   it('returns an empty graph and an explanatory summary when nothing is retrieved', async () => {
     const { query, generator } = buildQuery([]);
 
     const response = await query.execute('an unknown topic');
 
-    expect(response.graph).toEqual({ nodes: [], edges: [] });
+    expect(response.graph).toEqual({ nodes: [], edges: [], centralNodeId: null });
     expect(response.summary.length).toBeGreaterThan(0);
     expect(generator.calls).toHaveLength(0);
   });
@@ -158,7 +217,7 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('a question');
 
-    expect(response.graph).toEqual({ nodes: [], edges: [] });
+    expect(response.graph).toEqual({ nodes: [], edges: [], centralNodeId: null });
     expect(response.summary.length).toBeGreaterThan(0);
   });
 });

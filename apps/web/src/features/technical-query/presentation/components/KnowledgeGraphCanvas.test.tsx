@@ -8,7 +8,12 @@ import KnowledgeGraphCanvas from './KnowledgeGraphCanvas';
 import { useSelectedConceptStore } from '../stores/useSelectedConceptStore';
 
 interface MockReactFlowProps {
-  nodes: { id: string; type: string; data: Record<string, unknown> }[];
+  nodes: {
+    id: string;
+    type: string;
+    position: { x: number; y: number };
+    data: Record<string, unknown>;
+  }[];
   nodeTypes: Record<string, (props: { id: string; data: Record<string, unknown> }) => ReactElement>;
 }
 
@@ -17,7 +22,16 @@ vi.mock('@xyflow/react', () => ({
     <div data-testid="react-flow">
       {nodes.map((node) => {
         const NodeComponent = nodeTypes[node.type]!;
-        return <NodeComponent key={node.id} id={node.id} data={node.data} />;
+        return (
+          <div
+            key={node.id}
+            data-testid={`flow-node-${node.id}`}
+            data-x={node.position.x}
+            data-y={node.position.y}
+          >
+            <NodeComponent id={node.id} data={node.data} />
+          </div>
+        );
       })}
     </div>
   ),
@@ -33,7 +47,13 @@ const GRAPH: KnowledgeGraph = {
     { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
   ],
   edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
+  centralNodeId: null,
 };
+
+function positionOf(nodeId: string): { x: number; y: number } {
+  const element = screen.getByTestId(`flow-node-${nodeId}`);
+  return { x: Number(element.dataset.x), y: Number(element.dataset.y) };
+}
 
 describe('KnowledgeGraphCanvas', () => {
   it('renders every concept as an accessible link to its source that opens in a new tab', () => {
@@ -62,6 +82,7 @@ describe('KnowledgeGraphCanvas', () => {
         { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
       ],
       edges: [{ source: 'kafka', target: 'partition', relationship: 'splits into' }],
+      centralNodeId: null,
     };
 
     render(<KnowledgeGraphCanvas graph={graph} />);
@@ -74,5 +95,46 @@ describe('KnowledgeGraphCanvas', () => {
     expect(useSelectedConceptStore.getState().selectedNodeId).toBe('partition');
     expect(screen.queryByRole('link', { name: /partition/i })).not.toBeInTheDocument();
     expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('places the central node in the middle and labels it as the main idea', () => {
+    const graph: KnowledgeGraph = {
+      nodes: [
+        { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
+        {
+          id: 'kafka',
+          label: 'Apache Kafka',
+          type: 'concept',
+          sourceUrl: 'https://blog.test/kafka',
+        },
+        { id: 'topic', label: 'Topic', type: 'concept', sourceUrl: null },
+        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
+      ],
+      edges: [
+        { source: 'kafka', target: 'broker', relationship: 'runs on' },
+        { source: 'kafka', target: 'topic', relationship: 'organizes' },
+        { source: 'topic', target: 'partition', relationship: 'splits into' },
+      ],
+      centralNodeId: 'kafka',
+    };
+
+    render(<KnowledgeGraphCanvas graph={graph} />);
+
+    const mainIdea = screen.getByRole('link', {
+      name: 'Apache Kafka, main idea, open source in a new tab',
+    });
+    expect(mainIdea).toHaveTextContent('Main idea');
+    expect(screen.getAllByText('Main idea')).toHaveLength(1);
+    expect(
+      screen.getByRole('link', { name: 'Broker, open source in a new tab' }),
+    ).not.toHaveTextContent('Main idea');
+
+    const centre = positionOf('kafka');
+    const distances = ['broker', 'topic', 'partition'].map((nodeId) => {
+      const position = positionOf(nodeId);
+      return Math.hypot(position.x - centre.x, position.y - centre.y);
+    });
+    expect(distances[0]).toBeGreaterThan(0);
+    distances.forEach((distance) => expect(distance).toBeCloseTo(distances[0] ?? 0));
   });
 });

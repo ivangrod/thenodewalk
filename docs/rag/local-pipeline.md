@@ -38,11 +38,20 @@ fully local:
     retrieved post keeps it, and any duplicate or non-retrieved source becomes `null`. Nodes
     and edges are never dropped by this rule. The system prompt asks the LLM for the same
     rule, but the domain function is the source of truth.
+11. Every graph revolves around a central node: the node holding the main idea of the most
+    relevant post. No node can be more than `MAX_GRAPH_DEPTH` (3) levels away from it.
+    `AnswerTechnicalQueryQuery` enforces it after `assignUniqueSources` with two pure domain
+    functions: `resolveCentralNodeId` keeps the central node proposed by the LLM when it
+    exists, and otherwise falls back to the first node linked to the top-ranked post, then to
+    the first node. Then `limitGraphDepth` walks the graph breadth-first from the central node,
+    ignoring edge direction, and drops farther or disconnected nodes together with their edges.
+    The system prompt asks for the same rule, but the domain functions are the source of truth.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
 web client can link it to its source, or `null` when the concept has no post. The parser
-normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node.
+normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node. The graph
+exposes `centralNodeId: string | null`, which is `null` only when the graph has no nodes.
 
 ## Benefits
 
@@ -53,6 +62,7 @@ normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node
 - Prevents Nest dependency-injection failures that only appear when the full API boots.
 - Constrains unreliable LLM output before it crosses the API boundary.
 - Guarantees that every post appears once per graph and that no node links an invented source.
+- Keeps every graph focused on its main idea, however deep or scattered the LLM output is.
 - Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
   `DefaultEmbeddingFunction` warnings in the API logs.
 - Makes long ingestion runs observable feed by feed without polluting the domain event stream.
@@ -94,16 +104,22 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
   const embedding = await this.embeddings.generate(query);
   const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
 
-  if (matches.length === 0) {
+  const [mainMatch] = matches;
+  if (!mainMatch) {
     return { summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH };
   }
 
   try {
     const generated = await this.graphGenerator.generate(query, matches);
     const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
+    const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+    const centred = {
+      ...sourced,
+      centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+    };
     return this.toResponse({
       summary: generated.summary,
-      graph: assignUniqueSources(generated.graph, retrievedSourceUrls),
+      graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
     });
   } catch {
     return { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH };
@@ -116,6 +132,14 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
 ```typescript
 // Two nodes may link the same post, or a node may link a URL that was never retrieved.
 return this.toResponse(await this.graphGenerator.generate(query, matches));
+```
+
+### ❌ Bad: Trusting the LLM to keep the graph close to its main idea
+
+```typescript
+// The prompt asks for at most 3 levels, but nothing guarantees it: nodes may be
+// 5 hops away from the central node, or not connected to it at all.
+return this.toResponse({ summary: generated.summary, graph: generated.graph });
 ```
 
 ### ✅ Good: Explicit factory for adapters with local defaults
@@ -205,6 +229,7 @@ export class RssArticleFeedReader {
 - Read-only RAG Query: `apps/api/src/knowledge/application/answer-technical-query.query.ts`
 - Deterministic chunks and repository port: `apps/api/src/knowledge/domain/knowledge-chunk.ts` and `apps/api/src/knowledge/domain/knowledge-chunk-repository.ts`
 - Unique, grounded node sources: `assignUniqueSources` in `apps/api/src/knowledge/domain/knowledge-graph.ts`
+- Central node and 3-level depth limit: `resolveCentralNodeId` and `limitGraphDepth` in `apps/api/src/knowledge/domain/knowledge-graph-focus.ts`
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
 - Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`

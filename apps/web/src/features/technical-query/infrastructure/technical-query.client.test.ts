@@ -6,7 +6,7 @@ import { requestTechnicalQuery } from './technical-query.client';
 
 const RESPONSE: TechnicalQueryResponse = {
   summary: 'answer',
-  graph: { nodes: [], edges: [] },
+  graph: { nodes: [], edges: [], centralNodeId: null },
 };
 
 afterEach(() => {

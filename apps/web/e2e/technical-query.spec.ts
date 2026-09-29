@@ -13,6 +13,7 @@ const RESPONSE: TechnicalQueryResponse = {
       { id: 'services', label: 'Microservices', type: 'concept', sourceUrl: null },
     ],
     edges: [{ source: 'gateway', target: 'services', relationship: 'routes to' }],
+    centralNodeId: 'gateway',
   },
 };
 
@@ -52,9 +53,12 @@ test.describe('technical query flow', () => {
 
     await expect(page.getByText(/federated api gateway/i)).toBeVisible();
 
-    const nodeLink = page.getByRole('link', { name: /api gateway, open source in a new tab/i });
+    const nodeLink = page.getByRole('link', {
+      name: /api gateway, main idea, open source in a new tab/i,
+    });
     await expect(nodeLink).toBeVisible();
     await expect(nodeLink).toHaveAttribute('href', SOURCE_URL);
+    await expect(nodeLink).toContainText('Main idea');
 
     const popup = await Promise.all([page.waitForEvent('popup'), nodeLink.click()]).then(
       ([openedPopup]) => openedPopup,

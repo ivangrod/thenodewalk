@@ -19,6 +19,8 @@ export interface KnowledgeGraphEdge {
 export interface KnowledgeGraph {
   nodes: KnowledgeGraphNode[];
   edges: KnowledgeGraphEdge[];
+  /** Node holding the main idea (post) of the graph, or `null` when it is unknown or the graph is empty. */
+  centralNodeId: string | null;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface GeneratedGraph {
   graph: KnowledgeGraph;
 }
 
-export const EMPTY_GRAPH: KnowledgeGraph = { nodes: [], edges: [] };
+export const EMPTY_GRAPH: KnowledgeGraph = { nodes: [], edges: [], centralNodeId: null };
 
 /**
  * Enforces the source invariants of a knowledge graph:
@@ -59,5 +61,5 @@ export function assignUniqueSources(
     return node;
   });
 
-  return { nodes, edges: graph.edges };
+  return { ...graph, nodes };
 }
