@@ -1,4 +1,6 @@
-import { ChromaClient, type Metadata } from 'chromadb';
+import type { ChromaClient, Metadata } from 'chromadb';
+
+import { PrecomputedEmbeddingFunction } from './precomputed-embedding-function';
 
 /**
  * Minimal view of a ChromaDB collection used by the repository. Declaring it
@@ -51,19 +53,24 @@ export function chromaClientArgsFromUrl(url: string): {
 
 /**
  * Production {@link ChromaCollectionProvider} backed by a real ChromaDB client.
- * The collection handle is created once and reused across calls.
+ * The collection handle is created once and reused across calls. It is always
+ * resolved with a {@link PrecomputedEmbeddingFunction} because embeddings come
+ * from the `EmbeddingGenerator` port, never from Chroma's default function.
  */
 export class ChromaClientCollectionProvider implements ChromaCollectionProvider {
   private collectionPromise?: Promise<ChromaCollectionGateway>;
 
   constructor(
-    private readonly client: ChromaClient,
+    private readonly client: Pick<ChromaClient, 'getOrCreateCollection'>,
     private readonly collectionName: string,
   ) {}
 
   collection(): Promise<ChromaCollectionGateway> {
     this.collectionPromise ??= this.client
-      .getOrCreateCollection({ name: this.collectionName })
+      .getOrCreateCollection({
+        name: this.collectionName,
+        embeddingFunction: new PrecomputedEmbeddingFunction(),
+      })
       .then((collection) => ({
         upsert: (params) => collection.upsert(params),
         query: (params) => collection.query(params),
