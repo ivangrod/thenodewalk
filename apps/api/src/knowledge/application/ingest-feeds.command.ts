@@ -7,6 +7,10 @@ import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import { KnowledgeIngestionCompleted } from '../domain/events/knowledge-ingestion-completed';
 import { KnowledgeIngestionFailed } from '../domain/events/knowledge-ingestion-failed';
 import type { FeedSubscription, FeedSubscriptionReader } from '../domain/feed-subscription-reader';
+import type {
+  FeedIngestionProgress,
+  IngestionProgressReporter,
+} from '../domain/ingestion-progress-reporter';
 import { createKnowledgeChunk, type KnowledgeChunk } from '../domain/knowledge-chunk';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
 import type { ReadableArticleReader } from '../domain/readable-article-reader';
@@ -15,6 +19,7 @@ import {
   ARTICLE_FEED_READER,
   EMBEDDING_GENERATOR,
   FEED_SUBSCRIPTION_READER,
+  INGESTION_PROGRESS_REPORTER,
   KNOWLEDGE_CHUNK_REPOSITORY,
   READABLE_ARTICLE_READER,
 } from './knowledge.tokens';
@@ -33,6 +38,7 @@ export interface IngestionResult {
  * {@link KnowledgeChunk}s. All chunks are upserted idempotently. A failed feed is
  * isolated (its error is emitted as {@link KnowledgeIngestionFailed}) so the run
  * continues, and the run always ends by emitting {@link KnowledgeIngestionCompleted}.
+ * The progress of every feed is reported through {@link IngestionProgressReporter}.
  */
 @Injectable()
 export class IngestFeedsCommand {
@@ -49,6 +55,8 @@ export class IngestFeedsCommand {
     private readonly repository: KnowledgeChunkRepository,
     @Inject(EVENT_BUS)
     private readonly eventBus: EventBus,
+    @Inject(INGESTION_PROGRESS_REPORTER)
+    private readonly progress: IngestionProgressReporter,
   ) {}
 
   async execute(opmlPath: string): Promise<IngestionResult> {
@@ -58,19 +66,29 @@ export class IngestFeedsCommand {
     let processedFeeds = 0;
     let processedArticles = 0;
 
-    for (const subscription of subscriptions) {
+    for (const [index, subscription] of subscriptions.entries()) {
+      const feedProgress: FeedIngestionProgress = {
+        position: index + 1,
+        total: subscriptions.length,
+        blogName: subscription.blogName,
+        feedUrl: subscription.feedUrl,
+      };
+      this.progress.feedStarted(feedProgress);
+
       try {
         const feedChunks = await this.ingestSubscription(subscription);
         chunks.push(...feedChunks.chunks);
         processedArticles += feedChunks.articleCount;
         processedFeeds += 1;
+        this.progress.feedCompleted(feedProgress, {
+          articles: feedChunks.articleCount,
+          chunks: feedChunks.chunks.length,
+        });
       } catch (error) {
+        const reason = this.toReason(error);
+        this.progress.feedFailed(feedProgress, reason);
         await this.eventBus.publish([
-          new KnowledgeIngestionFailed(
-            subscription.feedUrl,
-            this.toReason(error),
-            new Date().toISOString(),
-          ),
+          new KnowledgeIngestionFailed(subscription.feedUrl, reason, new Date().toISOString()),
         ]);
       }
     }

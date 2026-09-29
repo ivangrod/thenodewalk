@@ -28,6 +28,10 @@ fully local:
    `PrecomputedEmbeddingFunction` guard so the SDK never falls back to its
    `DefaultEmbeddingFunction`, and do not install `@chroma-core/default-embed`. Embeddings are
    produced exclusively through the `EmbeddingGenerator` port.
+9. Ingestion reports the progress of every feed (`[position/total]`, `in progress`,
+   `completed` with its article and chunk totals, or `failed` with its reason) through the
+   `IngestionProgressReporter` domain port, implemented by a Nest `Logger` adapter. Progress is
+   not a state change, so it must not be modelled as domain events.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl` so the web client can link the generated concept to its source.
@@ -42,6 +46,7 @@ contains a `sourceUrl` so the web client can link the generated concept to its s
 - Constrains unreliable LLM output before it crosses the API boundary.
 - Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
   `DefaultEmbeddingFunction` warnings in the API logs.
+- Makes long ingestion runs observable feed by feed without polluting the domain event stream.
 
 ## Examples
 
@@ -122,6 +127,22 @@ this.client.getOrCreateCollection({
 this.client.getOrCreateCollection({ name: this.collectionName });
 ```
 
+### ✅ Good: Report feed progress through a port
+
+```typescript
+this.progress.feedStarted(feedProgress);
+// [1/2] Netflix Tech Blog (https://netflixtechblog.com/feed): in progress
+this.progress.feedCompleted(feedProgress, { articles, chunks });
+// [1/2] Netflix Tech Blog: completed (15 articles, 140 chunks)
+```
+
+### ❌ Bad: Modelling progress as domain events
+
+```typescript
+// Progress is not a state change: it floods the event stream with telemetry.
+await this.eventBus.publish([new KnowledgeFeedIngestionStarted(feedUrl, position, total)]);
+```
+
 ### ❌ Bad: Controller coupled to vector and LLM clients
 
 ```typescript
@@ -165,6 +186,7 @@ export class RssArticleFeedReader {
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
 - Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`
+- Feed progress port and logger adapter: `apps/api/src/knowledge/domain/ingestion-progress-reporter.ts` and `apps/api/src/knowledge/infrastructure/logging/logger-ingestion-progress-reporter.ts`
 - Shared HTTP contract: `packages/contracts/src/index.ts`
 
 ## Related agreements
