@@ -24,6 +24,10 @@ fully local:
 7. Infrastructure adapters with constructor collaborators that Nest cannot resolve must use
    an explicit `useFactory` provider. Default constructor values do not stop Nest from trying
    to inject their runtime type.
+8. Chroma collections store precomputed vectors only. Resolve them with the explicit
+   `PrecomputedEmbeddingFunction` guard so the SDK never falls back to its
+   `DefaultEmbeddingFunction`, and do not install `@chroma-core/default-embed`. Embeddings are
+   produced exclusively through the `EmbeddingGenerator` port.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl` so the web client can link the generated concept to its source.
@@ -36,6 +40,8 @@ contains a `sourceUrl` so the web client can link the generated concept to its s
 - Allows ChromaDB and Ollama adapters to be replaced or tested with hand-written doubles.
 - Prevents Nest dependency-injection failures that only appear when the full API boots.
 - Constrains unreliable LLM output before it crosses the API boundary.
+- Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
+  `DefaultEmbeddingFunction` warnings in the API logs.
 
 ## Examples
 
@@ -99,6 +105,23 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
 },
 ```
 
+### ✅ Good: Resolve Chroma collections with the precomputed-embeddings guard
+
+```typescript
+this.client.getOrCreateCollection({
+  name: this.collectionName,
+  embeddingFunction: new PrecomputedEmbeddingFunction(),
+});
+```
+
+### ❌ Bad: Letting Chroma fall back to its default embedding function
+
+```typescript
+// Tries to load @chroma-core/default-embed, logs a warning and stores a misleading
+// "default" embedding function in the collection configuration.
+this.client.getOrCreateCollection({ name: this.collectionName });
+```
+
 ### ❌ Bad: Controller coupled to vector and LLM clients
 
 ```typescript
@@ -141,6 +164,7 @@ export class RssArticleFeedReader {
 - Deterministic chunks and repository port: `apps/api/src/knowledge/domain/knowledge-chunk.ts` and `apps/api/src/knowledge/domain/knowledge-chunk-repository.ts`
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
+- Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`
 - Shared HTTP contract: `packages/contracts/src/index.ts`
 
 ## Related agreements

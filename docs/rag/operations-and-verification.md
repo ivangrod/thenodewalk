@@ -16,6 +16,17 @@ list, and verify the API and web application through the standard test suites.
 7. Run the mandatory format, lint, architecture, typecheck, unit, and E2E suites before
    considering a change complete.
 
+A `knowledge_chunks` collection created before the `PrecomputedEmbeddingFunction` guard keeps a
+`default` embedding function in its server-side configuration, and the SDK keeps logging the
+`DefaultEmbeddingFunction` warning when it opens it. Delete only that collection and ingest again.
+Ingestion is idempotent, so no other data migration is needed:
+
+```sh
+curl -X DELETE \
+  http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database/collections/knowledge_chunks
+pnpm --filter @thenodewalk/api ingest
+```
+
 Integration tests boot `KnowledgeModule` and override the external ports with hand-written
 doubles. Playwright E2E tests mock the API at the network boundary so the browser flow is stable
 and does not require ChromaDB or Ollama. The E2E flow must run Axe after the graph is rendered.
