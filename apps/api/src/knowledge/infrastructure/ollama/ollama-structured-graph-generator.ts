@@ -18,7 +18,7 @@ export class InvalidStructuredGraphError extends Error {
 }
 
 /** Versioned system prompt. Bump the version when the contract or rules change. */
-export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v1';
+export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v2';
 
 export const STRUCTURED_GRAPH_SYSTEM_PROMPT = `You are a senior software architect. Using ONLY the provided sources, answer the question as an interactive knowledge graph.
 Respond with a single JSON object and nothing else, matching exactly this schema:
@@ -26,7 +26,7 @@ Respond with a single JSON object and nothing else, matching exactly this schema
   "summary": string,               // concise natural-language answer
   "graph": {
     "nodes": [                     // key concepts
-      { "id": string, "label": string, "type": "concept", "sourceUrl": string }
+      { "id": string, "label": string, "type": "concept", "sourceUrl": string | null }
     ],
     "edges": [                     // semantic relationships between node ids
       { "source": string, "target": string, "relationship": string }
@@ -34,7 +34,8 @@ Respond with a single JSON object and nothing else, matching exactly this schema
   }
 }
 Rules:
-- Every node "sourceUrl" MUST be one of the provided source URLs.
+- A node "sourceUrl" MUST be one of the provided source URLs, or null.
+- Use null as "sourceUrl" when no provided source supports the concept.
 - Every edge "source" and "target" MUST reference an existing node "id".
 - "type" is always the literal "concept".
 - Do not invent facts that are not supported by the sources.
@@ -90,7 +91,7 @@ export class OllamaStructuredGraphGenerator implements StructuredGraphGenerator 
  * Parses and validates the raw LLM JSON into a {@link GeneratedGraph}. Throws
  * {@link InvalidStructuredGraphError} when the top-level shape is wrong, and
  * repairs the graph by dropping malformed nodes/edges and edges that reference
- * unknown nodes.
+ * unknown nodes. Nodes without a usable source are kept with `sourceUrl: null`.
  */
 export function parseGeneratedGraph(raw: string): GeneratedGraph {
   let parsed: unknown;
@@ -132,13 +133,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isNode(value: unknown): value is Record<string, unknown> {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.label === 'string' &&
-    typeof value.sourceUrl === 'string' &&
-    value.sourceUrl.length > 0
-  );
+  return isRecord(value) && typeof value.id === 'string' && typeof value.label === 'string';
 }
 
 function normalizeNode(value: Record<string, unknown>): KnowledgeGraphNode {
@@ -146,8 +141,13 @@ function normalizeNode(value: Record<string, unknown>): KnowledgeGraphNode {
     id: value.id as string,
     label: value.label as string,
     type: 'concept',
-    sourceUrl: value.sourceUrl as string,
+    sourceUrl: normalizeSourceUrl(value.sourceUrl),
   };
+}
+
+/** A missing, empty or non-string source means the concept has no linked post. */
+function normalizeSourceUrl(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
 function isEdge(value: unknown): value is KnowledgeGraphEdge {

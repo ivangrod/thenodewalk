@@ -30,7 +30,9 @@ fully local:
    produced exclusively through the `EmbeddingGenerator` port.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
-contains a `sourceUrl` so the web client can link the generated concept to its source.
+contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
+web client can link it to its source, or `null` when the concept has no post. The parser
+normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node.
 
 ## Benefits
 

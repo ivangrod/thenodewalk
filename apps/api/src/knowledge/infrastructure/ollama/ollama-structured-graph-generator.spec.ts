@@ -81,11 +81,11 @@ describe('parseGeneratedGraph', () => {
       graph: {
         nodes: [
           { id: 'a', label: 'A', type: 'concept', sourceUrl: 'https://blog.test/a' },
-          { id: 'b', label: 'B' }, // malformed: no sourceUrl
+          { id: 'b', sourceUrl: 'https://blog.test/b' }, // malformed: no label
         ],
         edges: [
           { source: 'a', target: 'a', relationship: 'self' },
-          { source: 'a', target: 'missing', relationship: 'points-to' }, // dangling
+          { source: 'a', target: 'b', relationship: 'points-to' }, // dangling
         ],
       },
     });
@@ -96,6 +96,31 @@ describe('parseGeneratedGraph', () => {
     expect(result.graph.nodes[0]?.id).toBe('a');
     expect(result.graph.edges).toHaveLength(1);
     expect(result.graph.edges[0]?.target).toBe('a');
+  });
+
+  it('keeps nodes without a source with a null sourceUrl', () => {
+    const raw = JSON.stringify({
+      summary: 'mixed',
+      graph: {
+        nodes: [
+          { id: 'linked', label: 'Linked', type: 'concept', sourceUrl: 'https://blog.test/a' },
+          { id: 'null', label: 'Null', type: 'concept', sourceUrl: null },
+          { id: 'empty', label: 'Empty', type: 'concept', sourceUrl: '' },
+          { id: 'missing', label: 'Missing', type: 'concept' },
+        ],
+        edges: [{ source: 'linked', target: 'missing', relationship: 'relates to' }],
+      },
+    });
+
+    const result = parseGeneratedGraph(raw);
+
+    expect(result.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
+      ['linked', 'https://blog.test/a'],
+      ['null', null],
+      ['empty', null],
+      ['missing', null],
+    ]);
+    expect(result.graph.edges).toHaveLength(1);
   });
 
   it('forces the node type to "concept"', () => {
