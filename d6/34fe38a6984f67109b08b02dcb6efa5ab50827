@@ -1,0 +1,55 @@
+apps/api/src/knowledge/application/answer-technical-query.query.spec.ts
+  s_0e92ee44163a51::t_8bfe70e3916a84 7-11,13-14,51,81,114,141-142,154-203,209,220
+apps/api/src/knowledge/application/answer-technical-query.query.ts
+  s_0e92ee44163a51::t_759da1a4c28d6a 7-10,12-16,37-39,59-60,67-71,74,104
+apps/api/src/knowledge/domain/knowledge-graph-focus.spec.ts
+  s_0e92ee44163a51::t_72f320dbcf21fc 1-133
+apps/api/src/knowledge/domain/knowledge-graph.spec.ts
+  s_0e92ee44163a51::t_bd528e83305798 15,32,52,66,75,86,95
+apps/api/src/knowledge/domain/knowledge-graph.ts
+  s_0e92ee44163a51::t_4148845cbfde4d 22-23,35,64
+apps/api/src/knowledge/domain/testing/knowledge.mother.ts
+  s_0e92ee44163a51::t_e2e43d33afe17d 10,70-85
+apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts
+  s_0e92ee44163a51::t_ef34dd859935fd 68,92,110,127
+apps/api/src/knowledge/infrastructure/http/technical-query.controller.spec.ts
+  s_0e92ee44163a51::t_df55140d46bd55 12-15,38
+apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.spec.ts
+  s_0e92ee44163a51::t_b9eab32a687ff5 35,138-153
+apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts
+  s_0e92ee44163a51::t_362409dc3a868a 10,22,34-35,43-44,99-100,133-138,155-156,160
+apps/web/e2e/technical-query.spec.ts
+  s_0e92ee44163a51::t_84da3f95e367d6 16,56-58,61
+apps/web/src/features/technical-query/infrastructure/technical-query.client.test.ts
+  s_0e92ee44163a51::t_19c02f60ca6a8d 9
+apps/web/src/features/technical-query/presentation/components/ConceptNode.tsx
+  s_0e92ee44163a51::t_a71fd93e506eaf 12-13,20,23-25,30-32,37-41,43-53,60,66,70,78
+apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.test.tsx
+  s_0e92ee44163a51::t_a9e40885415e93 11-16,25-34,50,53-57,85,99-139
+apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.tsx
+  s_0e92ee44163a51::t_e2aea2a9cb39e4 14,16-28,30-34,38-39
+apps/web/src/features/technical-query/presentation/components/TechnicalQueryView.test.tsx
+  s_0e92ee44163a51::t_595f5c2e2b4bd3 43,78
+docs/frontend/technical-query-knowledge-graph.md
+  s_0e92ee44163a51::t_c585799afef6c1 22-26,134-153,161
+docs/rag/local-pipeline.md
+  s_0e92ee44163a51::t_193af493529f42 41-48,53-54,65,107-108,115-119,122,137-144,232
+packages/contracts/src/index.ts
+  s_0e92ee44163a51::t_f3384e8b3f040b 27-31,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d634fe38a6984f67109b08b02dcb6efa5ab50827",
+  "prompts": {},
+  "sessions": {
+    "s_0e92ee44163a51": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f131a62c1ffe23gcWbdVnEUe5D",
+        "model": "claude-opus-5.5"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
