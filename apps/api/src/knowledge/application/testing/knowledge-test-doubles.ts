@@ -56,9 +56,14 @@ export class StubReadableArticleReader implements ReadableArticleReader {
   constructor(
     private readonly textByUrl: Map<string, string> = new Map(),
     private readonly defaultText = '',
+    private readonly failuresByUrl: Map<string, Error> = new Map(),
   ) {}
 
   read(articleUrl: string): Promise<string> {
+    const failure = this.failuresByUrl.get(articleUrl);
+    if (failure !== undefined) {
+      return Promise.reject(failure);
+    }
     return Promise.resolve(this.textByUrl.get(articleUrl) ?? this.defaultText);
   }
 }

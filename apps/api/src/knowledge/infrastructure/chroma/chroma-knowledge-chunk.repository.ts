@@ -11,12 +11,23 @@ import type { ChromaCollectionProvider } from './chroma-collection.provider';
 export const KNOWLEDGE_CHUNKS_COLLECTION = 'knowledge_chunks';
 
 /**
+ * Chunks sent per `upsert` request. ChromaDB rejects record sets above its
+ * `max_batch_size` (5461 on the local 1.5.x server, see
+ * `GET /api/v2/pre-flight-checks`), and a full OPML run produces far more chunks.
+ * 500 records of 768-dimension embeddings keep each request a few MiB.
+ */
+export const CHROMA_UPSERT_BATCH_SIZE = 500;
+
+/**
  * ChromaDB adapter for {@link KnowledgeChunkRepository}. Maps domain chunks to the
  * collection payload and back. Upserts are idempotent thanks to the deterministic
- * chunk ids.
+ * chunk ids, and are split into batches of {@link CHROMA_UPSERT_BATCH_SIZE}.
  */
 export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository {
-  constructor(private readonly provider: ChromaCollectionProvider) {}
+  constructor(
+    private readonly provider: ChromaCollectionProvider,
+    private readonly batchSize: number = CHROMA_UPSERT_BATCH_SIZE,
+  ) {}
 
   async upsert(chunks: KnowledgeChunk[]): Promise<void> {
     if (chunks.length === 0) {
@@ -24,12 +35,15 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
     }
 
     const collection = await this.provider.collection();
-    await collection.upsert({
-      ids: chunks.map((chunk) => chunk.id),
-      embeddings: chunks.map((chunk) => chunk.embedding),
-      documents: chunks.map((chunk) => chunk.document),
-      metadatas: chunks.map((chunk) => this.toMetadata(chunk.metadata)),
-    });
+    for (let start = 0; start < chunks.length; start += this.batchSize) {
+      const batch = chunks.slice(start, start + this.batchSize);
+      await collection.upsert({
+        ids: batch.map((chunk) => chunk.id),
+        embeddings: batch.map((chunk) => chunk.embedding),
+        documents: batch.map((chunk) => chunk.document),
+        metadatas: batch.map((chunk) => this.toMetadata(chunk.metadata)),
+      });
+    }
   }
 
   async search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]> {

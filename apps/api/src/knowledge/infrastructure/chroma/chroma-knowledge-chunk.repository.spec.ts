@@ -5,13 +5,16 @@ import type {
   ChromaCollectionGateway,
   ChromaCollectionProvider,
 } from './chroma-collection.provider';
-import { ChromaKnowledgeChunkRepository } from './chroma-knowledge-chunk.repository';
+import {
+  CHROMA_UPSERT_BATCH_SIZE,
+  ChromaKnowledgeChunkRepository,
+} from './chroma-knowledge-chunk.repository';
 
 type UpsertParams = Parameters<ChromaCollectionGateway['upsert']>[0];
 type QueryResponse = Awaited<ReturnType<ChromaCollectionGateway['query']>>;
 
 class FakeChromaCollection implements ChromaCollectionGateway {
-  upsertParams?: UpsertParams;
+  readonly upsertCalls: UpsertParams[] = [];
   queryResponse: QueryResponse = {
     ids: [[]],
     documents: [[]],
@@ -20,8 +23,12 @@ class FakeChromaCollection implements ChromaCollectionGateway {
     distances: [[]],
   };
 
+  get upsertParams(): UpsertParams | undefined {
+    return this.upsertCalls.at(-1);
+  }
+
   upsert(params: UpsertParams): Promise<void> {
-    this.upsertParams = params;
+    this.upsertCalls.push(params);
     return Promise.resolve();
   }
 
@@ -77,6 +84,26 @@ describe('ChromaKnowledgeChunkRepository', () => {
     await repository.upsert([]);
 
     expect(fake.upsertParams).toBeUndefined();
+  });
+
+  it('splits large upserts into batches that keep every chunk in order', async () => {
+    const fake = new FakeChromaCollection();
+    const repository = new ChromaKnowledgeChunkRepository(
+      new FakeChromaCollectionProvider(fake),
+      2,
+    );
+    const chunks = Array.from({ length: 5 }, (_, chunkIndex) =>
+      KnowledgeChunkMother.create({ articleUrl: 'https://blog.test/long', chunkIndex }),
+    );
+
+    await repository.upsert(chunks);
+
+    expect(fake.upsertCalls.map((call) => call.ids.length)).toEqual([2, 2, 1]);
+    expect(fake.upsertCalls.flatMap((call) => call.ids)).toEqual(chunks.map((chunk) => chunk.id));
+  });
+
+  it('keeps the default batch below the ChromaDB max batch size', () => {
+    expect(CHROMA_UPSERT_BATCH_SIZE).toBeLessThanOrEqual(5461);
   });
 
   it('maps a query result back into scored knowledge chunks', async () => {

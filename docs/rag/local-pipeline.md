@@ -9,10 +9,21 @@ fully local:
    extracts readable article text, chunks it, generates embeddings with Ollama, and
    idempotently upserts the chunks into ChromaDB.
 2. Chunk identifiers must be deterministic (`sha256(articleUrl#chunkIndex)`) so a repeat
-   ingestion updates the existing vector rather than creating duplicates.
+   ingestion updates the existing vector rather than creating duplicates. Because the id
+   derives from the article URL, an article must be ingested at most once per run: ChromaDB
+   rejects an upsert that repeats an id. `IngestFeedsCommand` ingests only the first
+   subscription of a feed URL repeated in the OPML, and skips an article already ingested
+   through another feed (cross-posts) or listed twice in the same feed. Article URLs are only
+   marked as ingested once their feed succeeds, so a feed that fails halfway does not hide its
+   articles from later feeds.
 3. Ingestion publishes `KnowledgeIngestionCompleted` for every completed run and
-   `KnowledgeIngestionFailed` for an individual feed failure. A failed feed must not stop
-   the remaining subscriptions.
+   `KnowledgeIngestionFailed` for an individual feed failure. A problem with a feed must never
+   stop the remaining subscriptions: an `inaccessible` feed (fetching or reading it throws), an
+   `empty` feed (read without error but yielding zero chunks, because the RSS has no entries
+   or none of its articles had extractable text), and a `duplicate` feed (its URL is already
+   declared earlier in the OPML) are all collected into `IngestionResult.issues` instead, so
+   the run ends with a full summary. A feed whose articles were all ingested through an
+   earlier feed is not `empty`: its content is indexed.
 4. `AnswerTechnicalQueryQuery` is a read-only Query. It embeds the question once, retrieves
    the Top-K `KnowledgeSearchMatch` values, and must not mutate state or publish events.
 5. A `StructuredGraphGenerator` receives the query plus traceable chunks (document text and
@@ -27,7 +38,10 @@ fully local:
 8. Chroma collections store precomputed vectors only. Resolve them with the explicit
    `PrecomputedEmbeddingFunction` guard so the SDK never falls back to its
    `DefaultEmbeddingFunction`, and do not install `@chroma-core/default-embed`. Embeddings are
-   produced exclusively through the `EmbeddingGenerator` port.
+   produced exclusively through the `EmbeddingGenerator` port. The Chroma adapter splits
+   upserts into batches of `CHROMA_UPSERT_BATCH_SIZE` (500), below the server's
+   `max_batch_size` (5461, see `GET /api/v2/pre-flight-checks`), because a full OPML run
+   produces far more chunks than a single request accepts.
 9. Ingestion reports the progress of every feed (`[position/total]`, `in progress`,
    `completed` with its article and chunk totals, or `failed` with its reason) through the
    `IngestionProgressReporter` domain port, implemented by a Nest `Logger` adapter. Progress is
@@ -71,6 +85,8 @@ exposes `centralNodeId: string | null`, which is `null` only when the graph has 
 - Keeps a single embedding model (Ollama) and avoids an unused ONNX dependency plus noisy
   `DefaultEmbeddingFunction` warnings in the API logs.
 - Makes long ingestion runs observable feed by feed without polluting the domain event stream.
+- Surfaces every unreachable or contentless feed in one place at the end of a run, instead of
+  requiring someone to scroll back through per-feed log lines to notice a silent gap.
 - Keeps memory use and latency of `/ask` predictable on any machine and avoids reloading the
   model between consecutive queries.
 
@@ -174,6 +190,62 @@ await this.client.chat({
 });
 ```
 
+### ✅ Good: Isolating a broken or contentless feed into the run's issue summary
+
+```typescript
+try {
+  const feedChunks = await this.ingestSubscription(subscription, ingestedArticleUrls);
+  chunks.push(...feedChunks.chunks);
+  if (feedChunks.chunks.length === 0 && feedChunks.alreadyIngestedArticles === 0) {
+    issues.push({
+      blogName,
+      feedUrl,
+      type: 'empty',
+      reason: this.emptyFeedReason(feedChunks.articleCount),
+    });
+  }
+} catch (error) {
+  issues.push({ blogName, feedUrl, type: 'inaccessible', reason: this.toReason(error) });
+  await this.eventBus.publish([new KnowledgeIngestionFailed(feedUrl, reason, now)]);
+}
+// The loop always continues; `issues` is returned once every subscription has been tried.
+return { processedFeeds, processedArticles, indexedChunks: chunks.length, issues };
+```
+
+### ❌ Bad: Letting a broken or contentless feed go unnoticed
+
+```typescript
+// Either throws and stops the whole OPML run, or silently reports "completed
+// (0 articles, 0 chunks)" with nothing to tell the caller a feed needs attention.
+const feedChunks = await this.ingestSubscription(subscription);
+chunks.push(...feedChunks.chunks);
+```
+
+### ✅ Good: Ingesting every article once per run and upserting in bounded batches
+
+```typescript
+// Command: a repeated feed URL becomes a `duplicate` issue, a seen article is skipped.
+if (ingestedArticleUrls.has(article.url)) {
+  alreadyIngestedArticles += 1;
+  continue;
+}
+
+// Chroma adapter: never send more than CHROMA_UPSERT_BATCH_SIZE records per request.
+for (let start = 0; start < chunks.length; start += this.batchSize) {
+  await collection.upsert(this.toPayload(chunks.slice(start, start + this.batchSize)));
+}
+```
+
+### ❌ Bad: Accumulating every chunk of the run and upserting them at once
+
+```typescript
+// "Facebook" and "Facebook AI Research" share https://engineering.fb.com/feed/, so the same
+// article yields the same sha256(articleUrl#chunkIndex) twice:
+//   ChromaValueError: Expected IDs to be unique, but found duplicates of ...
+// Even without duplicates, a full OPML run exceeds max_batch_size (5461) in one request.
+await collection.upsert({ ids: allRunChunks.map((chunk) => chunk.id) /* ... */ });
+```
+
 ### ✅ Good: Explicit factory for adapters with local defaults
 
 ```typescript
@@ -258,6 +330,9 @@ export class RssArticleFeedReader {
 ## Real world examples
 
 - Ingestion Command: `apps/api/src/knowledge/application/ingest-feeds.command.ts`
+- Inaccessible and empty feed issues: `FeedIngestionIssue` and `IngestionResult.issues` in
+  `apps/api/src/knowledge/application/ingest-feeds.command.ts`, printed by
+  `apps/api/src/knowledge/infrastructure/cli/ingest.ts`
 - Read-only RAG Query: `apps/api/src/knowledge/application/answer-technical-query.query.ts`
 - Deterministic chunks and repository port: `apps/api/src/knowledge/domain/knowledge-chunk.ts` and `apps/api/src/knowledge/domain/knowledge-chunk-repository.ts`
 - Unique, grounded node sources: `assignUniqueSources` in `apps/api/src/knowledge/domain/knowledge-graph.ts`
@@ -265,6 +340,8 @@ export class RssArticleFeedReader {
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
 - Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`
+- Batched Chroma upserts: `CHROMA_UPSERT_BATCH_SIZE` in `apps/api/src/knowledge/infrastructure/chroma/chroma-knowledge-chunk.repository.ts`
+- Duplicate feeds and articles per run: `splitDuplicateSubscriptions` and `ingestSubscription` in `apps/api/src/knowledge/application/ingest-feeds.command.ts`
 - Feed progress port and logger adapter: `apps/api/src/knowledge/domain/ingestion-progress-reporter.ts` and `apps/api/src/knowledge/infrastructure/logging/logger-ingestion-progress-reporter.ts`
 - Shared HTTP contract: `packages/contracts/src/index.ts`
 

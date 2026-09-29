@@ -15,7 +15,7 @@ import type { FeedSubscription } from '../domain/feed-subscription-reader';
 import { chunkText } from '../domain/text-chunker';
 import { FeedArticleMother, FeedSubscriptionMother } from '../domain/testing/knowledge.mother';
 
-const OPML_PATH = 'feeds/engineering_blogs.opml';
+const OPML_PATH = 'feeds/engineering_blogs_lite.opml';
 const EMBEDDING = [0.11, 0.22, 0.33];
 
 interface Scenario {
@@ -24,6 +24,7 @@ interface Scenario {
   failuresByFeedUrl?: Map<string, Error>;
   textByUrl?: Map<string, string>;
   defaultText?: string;
+  articleFailuresByUrl?: Map<string, Error>;
 }
 
 function buildCommand(scenario: Scenario): {
@@ -40,7 +41,11 @@ function buildCommand(scenario: Scenario): {
   const command = new IngestFeedsCommand(
     new StubFeedSubscriptionReader(scenario.subscriptions),
     new StubArticleFeedReader(scenario.articlesByFeedUrl, scenario.failuresByFeedUrl),
-    new StubReadableArticleReader(scenario.textByUrl, scenario.defaultText),
+    new StubReadableArticleReader(
+      scenario.textByUrl,
+      scenario.defaultText,
+      scenario.articleFailuresByUrl,
+    ),
     embeddings,
     repository,
     eventBus,
@@ -250,5 +255,182 @@ describe('IngestFeedsCommand', () => {
       ['completed', 2],
     ]);
     expect(progress.reports[1]).toMatchObject({ status: 'failed', reason: 'feed unreachable' });
+  });
+
+  it('collects an inaccessible feed as an issue and keeps processing the rest', async () => {
+    const healthy = FeedSubscriptionMother.create({ feedUrl: 'https://ok.test/feed' });
+    const broken = FeedSubscriptionMother.create({ feedUrl: 'https://broken.test/feed' });
+    const article = FeedArticleMother.create({ url: 'https://ok.test/post-1' });
+    const { command } = buildCommand({
+      subscriptions: [healthy, broken],
+      articlesByFeedUrl: new Map([[healthy.feedUrl, [article]]]),
+      failuresByFeedUrl: new Map([[broken.feedUrl, new Error('feed unreachable')]]),
+      textByUrl: new Map([[article.url, 'healthy content']]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.processedFeeds).toBe(1);
+    expect(result.issues).toEqual([
+      {
+        blogName: broken.blogName,
+        feedUrl: broken.feedUrl,
+        type: 'inaccessible',
+        reason: 'feed unreachable',
+      },
+    ]);
+  });
+
+  it('collects a feed with no RSS entries as an empty issue', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://empty.test/feed' });
+    const { command } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, []]]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.processedFeeds).toBe(1);
+    expect(result.indexedChunks).toBe(0);
+    expect(result.issues).toEqual([
+      {
+        blogName: subscription.blogName,
+        feedUrl: subscription.feedUrl,
+        type: 'empty',
+        reason: 'No articles found in the RSS feed',
+      },
+    ]);
+  });
+
+  it('collects a feed whose articles have no readable text as an empty issue', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const articles = [
+      FeedArticleMother.create({ url: 'https://blog.test/paywalled-1' }),
+      FeedArticleMother.create({ url: 'https://blog.test/paywalled-2' }),
+    ];
+    const { command } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, articles]]),
+      defaultText: '',
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.processedArticles).toBe(2);
+    expect(result.indexedChunks).toBe(0);
+    expect(result.issues).toEqual([
+      {
+        blogName: subscription.blogName,
+        feedUrl: subscription.feedUrl,
+        type: 'empty',
+        reason: 'No readable content extracted from 2 article(s)',
+      },
+    ]);
+  });
+
+  it('reports no issue for a feed that indexes at least one chunk', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const article = FeedArticleMother.create({ url: 'https://blog.test/post-1' });
+    const { command } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [article]]]),
+      textByUrl: new Map([[article.url, 'healthy content']]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.issues).toEqual([]);
+  });
+
+  it('ingests a feed URL repeated in the OPML once and reports the repetition as a duplicate', async () => {
+    const facebook = FeedSubscriptionMother.create({
+      blogName: 'Facebook',
+      feedUrl: 'https://engineering.fb.com/feed/',
+    });
+    const facebookAi = FeedSubscriptionMother.create({
+      blogName: 'Facebook AI Research',
+      feedUrl: 'https://engineering.fb.com/feed/',
+    });
+    const article = FeedArticleMother.create({ url: 'https://engineering.fb.com/post-1' });
+    const { command, repository, progress } = buildCommand({
+      subscriptions: [facebook, facebookAi],
+      articlesByFeedUrl: new Map([[facebook.feedUrl, [article]]]),
+      textByUrl: new Map([[article.url, 'facebook content']]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.processedFeeds).toBe(1);
+    expect(repository.lastUpsert.map((chunk) => chunk.metadata.blogName)).toEqual(['Facebook']);
+    expect(progress.reports.filter((report) => report.status === 'in progress')).toHaveLength(1);
+    expect(result.issues).toEqual([
+      {
+        blogName: 'Facebook AI Research',
+        feedUrl: 'https://engineering.fb.com/feed/',
+        type: 'duplicate',
+        reason: 'Same feed URL as "Facebook", which is ingested instead',
+      },
+    ]);
+  });
+
+  it('ingests an article shared by two feeds once, without reporting the second feed as empty', async () => {
+    const first = FeedSubscriptionMother.create({ feedUrl: 'https://first.test/feed' });
+    const second = FeedSubscriptionMother.create({ feedUrl: 'https://second.test/feed' });
+    const shared = FeedArticleMother.create({ url: 'https://shared.test/cross-post' });
+    const { command, repository } = buildCommand({
+      subscriptions: [first, second],
+      articlesByFeedUrl: new Map([
+        [first.feedUrl, [shared]],
+        [second.feedUrl, [shared]],
+      ]),
+      textByUrl: new Map([[shared.url, 'shared content']]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    const ids = repository.lastUpsert.map((chunk) => chunk.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(result.processedArticles).toBe(1);
+    expect(result.indexedChunks).toBe(1);
+    expect(result.issues).toEqual([]);
+  });
+
+  it('ingests an article listed twice in the same feed once', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const article = FeedArticleMother.create({ url: 'https://blog.test/post-1' });
+    const { command, repository } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [article, article]]]),
+      textByUrl: new Map([[article.url, 'listed twice']]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.processedArticles).toBe(1);
+    expect(repository.lastUpsert).toHaveLength(1);
+  });
+
+  it('still ingests a shared article through a later feed when the first feed fails halfway', async () => {
+    const failing = FeedSubscriptionMother.create({ feedUrl: 'https://failing.test/feed' });
+    const healthy = FeedSubscriptionMother.create({ feedUrl: 'https://ok.test/feed' });
+    const shared = FeedArticleMother.create({ url: 'https://shared.test/cross-post' });
+    const unreachable = FeedArticleMother.create({ url: 'https://failing.test/unreachable' });
+    const { command, repository } = buildCommand({
+      subscriptions: [failing, healthy],
+      articlesByFeedUrl: new Map([
+        [failing.feedUrl, [shared, unreachable]],
+        [healthy.feedUrl, [shared]],
+      ]),
+      defaultText: 'shared content',
+      articleFailuresByUrl: new Map([[unreachable.url, new Error('article unreachable')]]),
+    });
+
+    const result = await command.execute(OPML_PATH);
+
+    expect(result.issues.map((issue) => [issue.feedUrl, issue.type])).toEqual([
+      [failing.feedUrl, 'inaccessible'],
+    ]);
+    expect(repository.lastUpsert.map((chunk) => chunk.metadata.articleUrl)).toEqual([shared.url]);
+    expect(repository.lastUpsert[0]?.metadata.blogName).toBe(healthy.blogName);
   });
 });

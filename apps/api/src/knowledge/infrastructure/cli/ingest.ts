@@ -32,6 +32,13 @@ async function run(): Promise<void> {
     logger.log(
       `Done: ${result.processedFeeds} feeds, ${result.processedArticles} articles, ${result.indexedChunks} chunks indexed.`,
     );
+
+    if (result.issues.length > 0) {
+      logger.warn(`${result.issues.length} feed(s) need attention:`);
+      for (const issue of result.issues) {
+        logger.warn(`  - [${issue.type}] ${issue.blogName} (${issue.feedUrl}): ${issue.reason}`);
+      }
+    }
   } finally {
     await context.close();
   }

@@ -11,12 +11,12 @@ list, and verify the API and web application through the standard test suites.
 3. Copy the API and web example environment files before running the apps.
 4. Install and run Ollama locally, then pull `nomic-embed-text` for embeddings and
    `llama3.1:8b` for structured graph generation.
-5. Ingest feeds from `apps/api/feeds/engineering_blogs.opml` through the API ingestion CLI.
+5. Ingest feeds from `../../apps/api/feeds/engineering_blogs_lite.opml` through the API ingestion CLI.
 6. Start the apps with `pnpm dev`, use `/ask`, or call `POST /technical-queries` directly.
 7. Keep the Ollama app's global "Context length" setting bounded (8k is enough for the local RAG
    prompts). A large window (128k+) forces `llama3.1:8b` to reserve a multi-GiB KV cache (16 GiB
-   on Apple Silicon) and can freeze the host. The API already overrides it per request
-   (`OLLAMA_LLM_CONTEXT_LENGTH`, see [Local Pipeline](local-pipeline.md)), but the app-wide
+   on Apple Silicon) and can freeze the host. The API already overrides it per request (`OLLAMA_LLM_CONTEXT_LENGTH`,
+   see [Local Pipeline](local-pipeline.md)), but the app-wide
    setting still affects every other local Ollama client.
 8. Install `scripts/macos/ollama-env.plist` as a LaunchAgent so `OLLAMA_FLASH_ATTENTION`,
    `OLLAMA_KV_CACHE_TYPE`, and `OLLAMA_KEEP_ALIVE` survive reboots. A bare `launchctl setenv` only
@@ -186,9 +186,10 @@ await expect(page.getByText('Exact generated sentence')).toBeVisible();
 - Per-request context window and keep-alive: `ollamaGenerationSettingsFromEnv` and
   `DEFAULT_OLLAMA_GENERATION_SETTINGS` in
   `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
-- OPML source list: `apps/api/feeds/engineering_blogs.opml`
+- OPML source list: `../../apps/api/feeds/engineering_blogs_lite.opml`
 - Runnable ingestion entrypoint: `apps/api/src/knowledge/infrastructure/cli/ingest.ts`
-- HTTP integration test with overridden ports: `apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts`
+- HTTP integration test with overridden ports:
+  `apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts`
 - Playwright happy path and Axe scan: `apps/web/e2e/technical-query.spec.ts`
 - Root E2E orchestration: `package.json` and `turbo.json`
 
