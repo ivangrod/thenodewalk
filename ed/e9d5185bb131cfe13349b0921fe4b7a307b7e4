@@ -1,0 +1,35 @@
+apps/api/src/knowledge/application/answer-technical-query.query.spec.ts
+  s_24d4d85b0bf02c::t_fd4db31841a6f1 7,92-144
+apps/api/src/knowledge/application/answer-technical-query.query.ts
+  s_24d4d85b0bf02c::t_28116029484bc9 8,28-30,55-59
+apps/api/src/knowledge/domain/knowledge-graph.ts
+  s_24d4d85b0bf02c::t_b5bd6a88821bc1 34-63
+apps/api/src/knowledge/domain/testing/knowledge.mother.ts
+  s_24d4d85b0bf02c::t_8a8403f883d9c8 10,58-69
+apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts
+  s_9f1a44491b900e::t_294186d1e7e2f2 95-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ede9d5185bb131cfe13349b0921fe4b7a307b7e4",
+  "prompts": {},
+  "sessions": {
+    "s_24d4d85b0bf02c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f13283b58ffeZQc56nEbSDyfF4",
+        "model": "claude-opus-5.5"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    },
+    "s_9f1a44491b900e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f1321a07affeGTKEJKdocRd0sN",
+        "model": "claude-opus-5.5"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
