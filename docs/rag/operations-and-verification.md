@@ -7,7 +7,12 @@ Contributors run the local infrastructure, pull the required Ollama models, inge
 list, and verify the API and web application through the standard test suites.
 
 1. Use Node 22 and pnpm 10.24.0, then run `corepack enable` and `pnpm install`.
-2. Run Docker infrastructure with `pnpm infra:up`. This starts PostgreSQL and ChromaDB.
+2. Run Docker infrastructure with `pnpm infra:up`. This starts PostgreSQL, ChromaDB, pgAdmin, and
+   ChromaDB UI. pgAdmin is available at `http://localhost:5050` with the local default login
+   `admin@thenodewalk.local` / `thenodewalk`; the `postgres` server is preconfigured and uses
+   database credentials `thenodewalk` / `thenodewalk`. ChromaDB UI is at `http://localhost:8090`;
+   connect it to `http://localhost:8000` with tenant `default_tenant` and database
+   `default_database`. Compose configures ChromaDB CORS for the UI's local origin.
 3. Copy the API and web example environment files before running the apps.
 4. Install and run Ollama locally, then pull `nomic-embed-text` for embeddings and
    `llama3.1:8b` for structured graph generation.

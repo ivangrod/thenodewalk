@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready --username=thenodewalk --dbname=thenodewalk']
+      test: [ 'CMD-SHELL', 'pg_isready --username=thenodewalk --dbname=thenodewalk' ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,17 +22,45 @@ services:
   chromadb:
     image: chromadb/chroma:1.5.3
     restart: unless-stopped
+    environment:
+      CHROMA_CORS_ALLOW_ORIGINS: '["http://localhost:${CHROMA_UI_PORT:-8090}"]'
     ports:
       - '${CHROMA_PORT:-8000}:8000'
     volumes:
       - chroma-data:/data
     healthcheck:
-      test: ['CMD', 'curl', '--fail', 'http://localhost:8000/api/v2/heartbeat']
+      test: [ 'CMD', 'curl', '--fail', 'http://localhost:8000/api/v2/heartbeat' ]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
+  pgadmin:
+    image: dpage/pgadmin4:9.18
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: '${PGADMIN_DEFAULT_EMAIL:-admin@thenodewalk.com}'
+      PGADMIN_DEFAULT_PASSWORD: '${PGADMIN_DEFAULT_PASSWORD:-thenodewalk}'
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGADMIN_REPLACE_SERVERS_ON_STARTUP: 'True'
+    ports:
+      - '${PGADMIN_PORT:-5050}:80'
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin-servers.json:/pgadmin4/servers.json:ro
+
+  chromadb-ui:
+    build:
+      context: https://github.com/BlackyDrum/chromadb-ui.git#main
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '${CHROMA_UI_PORT:-8090}:80'
+
 volumes:
   postgres-data:
   chroma-data:
+  pgadmin-data:

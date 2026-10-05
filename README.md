@@ -25,8 +25,9 @@ The web app runs at `http://localhost:3000`, the API at `http://localhost:3001`,
 
 ## Local Infrastructure
 
-Docker Compose starts PostgreSQL 17 (relational data) and ChromaDB (the RAG vector store),
-with persistent data in the `postgres-data` and `chroma-data` volumes.
+Docker Compose starts PostgreSQL 17 (relational data), ChromaDB (the RAG vector store),
+pgAdmin, and ChromaDB UI. Database and vector data persist in the `postgres-data` and
+`chroma-data` volumes; pgAdmin configuration persists in `pgadmin-data`.
 
 ```sh
 pnpm infra:up
@@ -34,7 +35,16 @@ cp apps/api/.env.example apps/api/.env
 pnpm --filter @thenodewalk/api prisma:migrate
 ```
 
-The database is available at `localhost:5432`. Values in `compose.yaml` and `.env.example` are only for local development; they are not used for Supabase or production.
+The database is available at `localhost:5432`. Open pgAdmin at `http://localhost:5050`
+(`admin@thenodewalk.local` / `thenodewalk`) to administer the preconfigured `postgres` server;
+its database credentials are `thenodewalk` / `thenodewalk`. Open ChromaDB UI at
+`http://localhost:8090` and connect it to `http://localhost:8000` (tenant
+`default_tenant`, database `default_database`). The ChromaDB UI image is built from the upstream
+[BlackyDrum/chromadb-ui](https://github.com/BlackyDrum/chromadb-ui) repository when Compose starts.
+
+Override the local UI ports or pgAdmin login with `PGADMIN_PORT`, `PGADMIN_DEFAULT_EMAIL`,
+`PGADMIN_DEFAULT_PASSWORD`, `CHROMA_UI_PORT`, and `CHROMA_PORT`. Values in `compose.yaml` are only
+for local development; they are not used for Supabase or production.
 
 ```sh
 pnpm infra:ps
