@@ -1,0 +1,20 @@
+README.md
+  h_a3b97539b00b18 28-30,38-47
+compose.yaml
+  h_a3b97539b00b18 16,25-26,32,38-62,66
+docs/rag/operations-and-verification.md
+  h_a3b97539b00b18 10-15
+pgadmin-servers.json
+  h_a3b97539b00b18 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "eba2f0d94da1e894ff02bd0ab4af1300fc082c35",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
