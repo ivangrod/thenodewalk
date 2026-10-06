@@ -113,6 +113,8 @@ pnpm --filter @thenodewalk/api ingest path/to/feeds.opml
 pnpm --filter @thenodewalk/api ingest --full path/to/feeds.opml
 ```
 
+The ingestion CLI explicitly loads `apps/api/.env`; exported environment
+variables take precedence. Copy `apps/api/.env.example` to `apps/api/.env` before running it.
 Incremental ingestion loads the latest indexed publication date per `blogName` from
 PostgreSQL once, then skips dated posts at or before that date before fetching article
 text or generating embeddings. Posts are sorted newest first, and chunks are saved feed

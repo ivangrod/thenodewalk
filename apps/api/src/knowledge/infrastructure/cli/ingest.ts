@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 
 import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -20,6 +22,13 @@ const DEFAULT_OPML_PATH = 'feeds/engineering_blogs.opml';
  */
 async function run(): Promise<void> {
   const logger = new Logger('IngestFeedsCli');
+  const envPath = resolve(__dirname, '../../../../.env');
+  if (existsSync(envPath)) loadEnvFile(envPath);
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL is required. Copy apps/api/.env.example to apps/api/.env or export DATABASE_URL before running ingestion.',
+    );
+  }
   const args = process.argv.slice(2);
   const paths = args.filter((argument) => argument !== '--full');
   if (paths.length > 1 || paths.some((argument) => argument.startsWith('--'))) {
