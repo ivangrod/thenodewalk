@@ -1,0 +1,20 @@
+apps/api/prisma/migrations/20261006000000_init/migration.sql
+  h_a3b97539b00b18 1-32
+apps/api/prisma/migrations/20261006000001_add_feed_last_publication_dates/migration.sql
+  h_a3b97539b00b18 1-7
+apps/api/prisma/migrations/migration_lock.toml
+  h_a3b97539b00b18 1
+apps/api/prisma/schema.prisma
+  h_a3b97539b00b18 10-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2a1186393ad9c48a93a88852ad40661b7ce53049",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
