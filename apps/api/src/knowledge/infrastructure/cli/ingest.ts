@@ -8,6 +8,10 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { IngestFeedsCommand } from '../../application/ingest-feeds.command';
+import {
+  CHROMA_COLLECTION_PROVIDER,
+  type ChromaCollectionProvider,
+} from '../chroma/chroma-collection.provider';
 import { KnowledgeModule } from '../knowledge.module';
 
 const DEFAULT_OPML_PATH = 'feeds/engineering_blogs.opml';
@@ -41,6 +45,9 @@ async function run(): Promise<void> {
   });
 
   try {
+    // Fail before fetching any feed when the vector store cannot hold the vectors
+    // (for example, an `l2` collection built with an older embedding scheme).
+    await context.get<ChromaCollectionProvider>(CHROMA_COLLECTION_PROVIDER).collection();
     logger.log(`Ingesting feeds from ${opmlPath}`);
     const result = await context
       .get(IngestFeedsCommand)

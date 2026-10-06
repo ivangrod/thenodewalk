@@ -58,7 +58,7 @@ describe('Incremental ingestion wiring', () => {
         issues: [],
       });
       expect(readable.calls).toEqual([article.url]);
-      expect(embeddings.prompts).toHaveLength(1);
+      expect(embeddings.documents).toHaveLength(1);
       expect(dates.findAllCalls).toBe(2);
       expect((await command.execute('test.opml', { full: true })).indexedChunks).toBe(1);
       expect(dates.findAllCalls).toBe(2);

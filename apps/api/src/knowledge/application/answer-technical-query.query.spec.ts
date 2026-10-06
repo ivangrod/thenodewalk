@@ -55,7 +55,8 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('How does Netflix scale its API?');
 
-    expect(embeddings.prompts).toEqual(['How does Netflix scale its API?']);
+    expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
+    expect(embeddings.documentBatches).toEqual([]);
     expect(repository.searchCalls[0]?.limit).toBe(TECHNICAL_QUERY_TOP_K);
     expect(generator.calls).toHaveLength(1);
     expect(response.summary).toBe('Netflix uses a federated API gateway.');

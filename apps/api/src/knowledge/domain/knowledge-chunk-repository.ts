@@ -1,8 +1,8 @@
 import type { KnowledgeChunk } from './knowledge-chunk';
 
 /**
- * A chunk retrieved from the vector store together with its relevance score
- * (higher means closer to the query embedding).
+ * A chunk retrieved from the vector store together with its relevance score: the
+ * cosine similarity to the query embedding, in `[-1, 1]` (higher is closer).
  */
 export interface KnowledgeSearchMatch {
   chunk: KnowledgeChunk;

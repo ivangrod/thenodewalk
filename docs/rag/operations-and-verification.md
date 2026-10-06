@@ -52,6 +52,22 @@ curl -X DELETE \
 pnpm --filter @thenodewalk/api ingest
 ```
 
+A `knowledge_chunks` collection created before the cosine embedding scheme uses the `l2`
+distance and holds unnormalized vectors without task prefixes. Both ingestion and
+`POST /technical-queries` fail with `IncompatibleKnowledgeCollectionError` until it is rebuilt;
+the ingestion CLI resolves the collection before fetching any feed, so it fails immediately.
+Delete it and run a full ingestion, because PostgreSQL cursors would otherwise skip every post
+already indexed. Posts that are no longer listed in their RSS feed cannot be recovered this way:
+
+```sh
+curl -X DELETE \
+  http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database/collections/knowledge_chunks
+pnpm --filter @thenodewalk/api ingest --full
+```
+
+Any manual semantic search (ChromaDB UI, `curl`, notebooks) must embed the question exactly like
+the API: `/api/embed` with the same model and the `search_query: ` prefix for `nomic-embed-text`.
+
 Integration tests boot `KnowledgeModule` and override the external ports with hand-written
 doubles. Playwright E2E tests mock the API at the network boundary so the browser flow is stable
 and does not require ChromaDB or Ollama. The E2E flow must run Axe after the graph is rendered.
@@ -66,6 +82,8 @@ and does not require ChromaDB or Ollama. The E2E flow must run Axe after the gra
   configuration.
 - Makes common local incidents (API not running, wiped vector store) quick to diagnose from
   logs and container state instead of guessing or blaming the query code.
+- Keeps manual searches comparable with the API results, so a debugging session never chases
+  rankings produced by a different embedding scheme.
 - Avoids flaky E2E tests caused by live feeds, LLM output, or public source websites.
 
 ## Examples
@@ -173,7 +191,28 @@ docker inspect thenodewalk-chromadb-1 --format '{{json .Mounts}}'
 # Confirm /data is a bind mount sourced from this project's data_containers/chromadb.
 curl --fail http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database/collections
 # If knowledge_chunks is missing or empty, ingest feeds again.
+# Its configuration_json.hnsw.space must be "cosine"; otherwise delete it and run --full.
 pnpm --filter @thenodewalk/api ingest --full
+```
+
+### ✅ Good: Embedding a manual search question like the API
+
+```sh
+curl -s http://localhost:11434/api/embed -d '{
+  "model": "nomic-embed-text",
+  "input": "search_query: Is Kafka a good fit for event-driven architecture?"
+}'
+# Send `.embeddings[0]` to the collection's /query endpoint as `query_embeddings`.
+```
+
+### ❌ Bad: Searching with a vector from another embedding scheme
+
+```sh
+curl -s http://localhost:11434/api/embeddings -d '{
+  "model": "nomic-embed-text", "prompt": "Is Kafka a good fit for event-driven architecture?"
+}'
+# Different endpoint, no task prefix: the ranking no longer matches what the API retrieves,
+# and in an l2 collection it can return unrelated chunks for any question.
 ```
 
 ### ❌ Bad: Running a query before its local dependencies are ready
@@ -202,6 +241,8 @@ await expect(page.getByText('Exact generated sentence')).toBeVisible();
   `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - OPML source list: `../../apps/api/feeds/engineering_blogs_lite.opml`
 - Runnable ingestion entrypoint: `apps/api/src/knowledge/infrastructure/cli/ingest.ts`
+- Stale collection detection: `IncompatibleKnowledgeCollectionError` in
+  `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`
 - HTTP integration test with overridden ports:
   `apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts`
 - Playwright happy path and Axe scan: `apps/web/e2e/technical-query.spec.ts`

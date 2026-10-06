@@ -128,6 +128,11 @@ Renaming a blog triggers a full ingestion for that new name. The comparison is s
 newer: backdated posts and posts later added with the exact cursor timestamp require `--full`.
 The first run after upgrading reingests existing vectors idempotently to populate dates.
 
+Chunks and questions are embedded with Ollama's `/api/embed` and the task prefixes of the
+embedding model, and compared with the cosine distance. A `knowledge_chunks` collection built
+with the previous `l2` scheme is rejected with `IncompatibleKnowledgeCollectionError`: delete it
+and run `ingest --full` (see `docs/rag/operations-and-verification.md`).
+
 ### Ask a question
 
 ```sh

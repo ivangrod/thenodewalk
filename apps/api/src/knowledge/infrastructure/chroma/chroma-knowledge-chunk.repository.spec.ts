@@ -135,4 +135,29 @@ describe('ChromaKnowledgeChunkRepository', () => {
     // distance 0 -> maximum similarity score of 1.
     expect(results[0]?.score).toBe(1);
   });
+
+  it('scores every match with the cosine similarity behind its cosine distance', async () => {
+    const fake = new FakeChromaCollection();
+    const metadata = (articleUrl: string): Metadata => ({
+      blogName: 'Blog',
+      articleTitle: 'Title',
+      articleUrl,
+      publishedAt: '',
+      chunkIndex: 0,
+    });
+    fake.queryResponse = {
+      ids: [['close', 'unrelated', 'opposite']],
+      documents: [['close', 'unrelated', 'opposite']],
+      embeddings: null,
+      metadatas: [
+        [metadata('https://a.test'), metadata('https://b.test'), metadata('https://c.test')],
+      ],
+      distances: [[0.25, 1, 2]],
+    };
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+
+    const results = await repository.search([1, 0], 3);
+
+    expect(results.map((result) => result.score)).toEqual([0.75, 0, -1]);
+  });
 });

@@ -78,7 +78,7 @@ describe('POST /technical-queries (integration)', () => {
       .send({ query: 'How does Netflix scale its API?' })
       .expect(201);
 
-    expect(embeddings.prompts).toEqual(['How does Netflix scale its API?']);
+    expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
     expect(repository.searchCalls).toHaveLength(1);
     expect(generator.calls).toHaveLength(1);
     expect(response.body).toEqual({

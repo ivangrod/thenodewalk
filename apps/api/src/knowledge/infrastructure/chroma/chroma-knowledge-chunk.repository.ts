@@ -76,14 +76,14 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
   }
 
   /**
-   * Converts a distance (lower is closer) into a similarity score in `(0, 1]`
-   * (higher is more relevant).
+   * Converts a cosine distance (`1 - cosine similarity`, lower is closer) back into
+   * the cosine similarity in `[-1, 1]` (higher is more relevant).
    */
   private toScore(distance: number | null | undefined): number {
     if (distance === null || distance === undefined) {
       return 0;
     }
-    return 1 / (1 + Math.max(0, distance));
+    return 1 - distance;
   }
 
   private toMetadata(metadata: KnowledgeChunkMetadata): Metadata {
