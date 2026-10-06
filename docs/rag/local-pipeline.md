@@ -94,6 +94,13 @@ fully local:
     prefixes, embedded text, or distance) invalidates every stored vector: delete the
     collection and run `ingest --full`.
 
+The query enriches surviving, grounded nodes with `source: { articleTitle, blogName,
+publishedAt }` using retrieved chunk metadata. The first (highest-ranked) match wins
+when an article has several chunks. Blank fields and invalid dates become `null`;
+unsourced nodes have `source: null`. The LLM never generates this provenance, and the
+projection performs no writes or additional network requests. The web opens these
+details in an accessible modal before navigating to the article.
+
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
 web client can link it to its source, or `null` when the concept has no post. The parser

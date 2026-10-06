@@ -1,140 +1,90 @@
-import { act, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, act, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-
 import type { KnowledgeGraph } from '@thenodewalk/contracts';
-
 import KnowledgeGraphCanvas from './KnowledgeGraphCanvas';
-import { useSelectedConceptStore } from '../stores/useSelectedConceptStore';
+import type { ConceptGraphNode } from './ConceptNode';
 
-interface MockReactFlowProps {
-  nodes: {
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    data: Record<string, unknown>;
-  }[];
-  nodeTypes: Record<string, (props: { id: string; data: Record<string, unknown> }) => ReactElement>;
-}
-
-vi.mock('@xyflow/react', () => ({
-  ReactFlow: ({ nodes, nodeTypes }: MockReactFlowProps) => (
-    <div data-testid="react-flow">
-      {nodes.map((node) => {
-        const NodeComponent = nodeTypes[node.type]!;
-        return (
-          <div
-            key={node.id}
-            data-testid={`flow-node-${node.id}`}
-            data-x={node.position.x}
-            data-y={node.position.y}
-          >
-            <NodeComponent id={node.id} data={node.data} />
-          </div>
-        );
-      })}
-    </div>
+vi.mock('d3-graph-react', () => ({
+  Graph: ({
+    graph,
+    NodeComponent,
+  }: {
+    graph: { nodes: ConceptGraphNode[] };
+    NodeComponent: (props: { node: ConceptGraphNode }) => ReactElement;
+  }) => (
+    <svg>
+      <foreignObject>
+        {graph.nodes.map((node) => (
+          <NodeComponent key={node.id} node={node} />
+        ))}
+      </foreignObject>
+    </svg>
   ),
-  Background: () => null,
-  Controls: () => null,
-  Handle: () => null,
-  Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
 }));
 
 const GRAPH: KnowledgeGraph = {
   nodes: [
-    { id: 'kafka', label: 'Apache Kafka', type: 'concept', sourceUrl: 'https://blog.test/kafka' },
-    { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
+    {
+      id: 'kafka',
+      label: 'Apache Kafka',
+      type: 'concept',
+      sourceUrl: 'https://blog.test/kafka',
+      source: {
+        articleTitle: 'Kafka at scale',
+        blogName: 'Netflix',
+        publishedAt: '2026-01-02T00:00:00.000Z',
+      },
+    },
+    { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: null, source: null },
   ],
   edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
-  centralNodeId: null,
+  centralNodeId: 'kafka',
 };
 
-function positionOf(nodeId: string): { x: number; y: number } {
-  const element = screen.getByTestId(`flow-node-${nodeId}`);
-  return { x: Number(element.dataset.x), y: Number(element.dataset.y) };
-}
-
 describe('KnowledgeGraphCanvas', () => {
-  it('renders every concept as an accessible link to its source that opens in a new tab', () => {
+  it('opens a modal with authoritative article metadata and a new-tab link', async () => {
     render(<KnowledgeGraphCanvas graph={GRAPH} />);
+    const node = screen.getByRole('button', {
+      name: 'Apache Kafka, main idea, view article details',
+    });
+    expect(node).toHaveTextContent('Main idea');
+    act(() => node.focus());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(node);
+    expect(screen.getByRole('dialog', { name: 'Kafka at scale' })).toBeInTheDocument();
+    expect(screen.getByText('January 2, 2026')).toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /go to netflix/i });
+    expect(link).toHaveAttribute('href', 'https://blog.test/kafka');
+    expect(link).toHaveAttribute('target', '_blank');
+    fireEvent.click(screen.getByRole('button', { name: 'Close article details' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(node).toHaveFocus());
+  });
 
-    const kafkaLink = screen.getByRole('link', { name: /apache kafka, open source in a new tab/i });
-    expect(kafkaLink).toHaveAttribute('href', 'https://blog.test/kafka');
-    expect(kafkaLink).toHaveAttribute('target', '_blank');
-    expect(kafkaLink).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
+  it('keeps unsourced concepts selectable without opening a modal', () => {
+    render(<KnowledgeGraphCanvas graph={GRAPH} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Broker, no linked source' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByRole('link', { name: /broker, open source in a new tab/i })).toHaveAttribute(
-      'href',
-      'https://blog.test/broker',
+  it('handles old responses without metadata and closes details when the graph changes', () => {
+    const old: KnowledgeGraph = { ...GRAPH, nodes: [{ ...GRAPH.nodes[0]!, source: undefined }] };
+    const { rerender } = render(<KnowledgeGraphCanvas graph={old} />);
+    fireEvent.click(screen.getByRole('button', { name: /view article details/i }));
+    expect(screen.getByRole('dialog', { name: 'Article title unavailable' })).toBeInTheDocument();
+    expect(screen.getByText('Publication date unavailable')).toBeInTheDocument();
+    rerender(<KnowledgeGraphCanvas graph={GRAPH} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('does not expose unsafe source links', () => {
+    render(
+      <KnowledgeGraphCanvas
+        graph={{ ...GRAPH, nodes: [{ ...GRAPH.nodes[0]!, sourceUrl: 'javascript:alert(1)' }] }}
+      />,
     );
-  });
-
-  it('renders a concept without a source as a focusable button that is not a link', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [
-        {
-          id: 'kafka',
-          label: 'Apache Kafka',
-          type: 'concept',
-          sourceUrl: 'https://blog.test/kafka',
-        },
-        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
-      ],
-      edges: [{ source: 'kafka', target: 'partition', relationship: 'splits into' }],
-      centralNodeId: null,
-    };
-
-    render(<KnowledgeGraphCanvas graph={graph} />);
-
-    const partition = screen.getByRole('button', { name: /partition, no linked source/i });
-    expect(partition).toHaveAttribute('type', 'button');
-    expect(partition).not.toHaveAttribute('href');
-    act(() => partition.focus());
-    expect(partition).toHaveFocus();
-    expect(useSelectedConceptStore.getState().selectedNodeId).toBe('partition');
-    expect(screen.queryByRole('link', { name: /partition/i })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link')).toHaveLength(1);
-  });
-
-  it('places the central node in the middle and labels it as the main idea', () => {
-    const graph: KnowledgeGraph = {
-      nodes: [
-        { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
-        {
-          id: 'kafka',
-          label: 'Apache Kafka',
-          type: 'concept',
-          sourceUrl: 'https://blog.test/kafka',
-        },
-        { id: 'topic', label: 'Topic', type: 'concept', sourceUrl: null },
-        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
-      ],
-      edges: [
-        { source: 'kafka', target: 'broker', relationship: 'runs on' },
-        { source: 'kafka', target: 'topic', relationship: 'organizes' },
-        { source: 'topic', target: 'partition', relationship: 'splits into' },
-      ],
-      centralNodeId: 'kafka',
-    };
-
-    render(<KnowledgeGraphCanvas graph={graph} />);
-
-    const mainIdea = screen.getByRole('link', {
-      name: 'Apache Kafka, main idea, open source in a new tab',
-    });
-    expect(mainIdea).toHaveTextContent('Main idea');
-    expect(screen.getAllByText('Main idea')).toHaveLength(1);
-    expect(
-      screen.getByRole('link', { name: 'Broker, open source in a new tab' }),
-    ).not.toHaveTextContent('Main idea');
-
-    const centre = positionOf('kafka');
-    const distances = ['broker', 'topic', 'partition'].map((nodeId) => {
-      const position = positionOf(nodeId);
-      return Math.hypot(position.x - centre.x, position.y - centre.y);
-    });
-    expect(distances[0]).toBeGreaterThan(0);
-    distances.forEach((distance) => expect(distance).toBeCloseTo(distances[0] ?? 0));
+    fireEvent.click(screen.getByRole('button', { name: /view article details/i }));
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

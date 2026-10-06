@@ -32,6 +32,42 @@ function buildQuery(matches: KnowledgeSearchMatch[]): {
 }
 
 describe('AnswerTechnicalQueryQuery', () => {
+  it('joins metadata from the highest-ranked retrieved chunk and normalizes unknown fields', async () => {
+    const url = 'https://blog.test/source';
+    const first = {
+      chunk: KnowledgeChunkMother.create({
+        articleUrl: url,
+        articleTitle: '  Indexed title  ',
+        blogName: 'Netflix',
+        publishedAt: 'invalid',
+      }),
+      score: 0.9,
+    };
+    const second = {
+      chunk: KnowledgeChunkMother.create({
+        articleUrl: url,
+        articleTitle: 'Different title',
+        blogName: 'Other origin',
+      }),
+      score: 0.8,
+    };
+    const { query, generator } = buildQuery([first, second]);
+    generator.result = {
+      summary: 'Summary',
+      graph: {
+        nodes: [{ id: 'source', label: 'Concept', type: 'concept', sourceUrl: url }],
+        edges: [],
+        centralNodeId: 'source',
+      },
+    };
+    const response = await query.execute('Question');
+    expect(response.graph.nodes[0]?.source).toEqual({
+      articleTitle: 'Indexed title',
+      blogName: 'Netflix',
+      publishedAt: null,
+    });
+  });
+
   it('embeds the question once, retrieves Top-K context and returns summary + graph', async () => {
     const { query, embeddings, repository, generator } = buildQuery([
       matchWith('https://netflixtechblog.com/post'),
@@ -91,8 +127,12 @@ describe('AnswerTechnicalQueryQuery', () => {
         label: 'Event Sourcing',
         type: 'concept',
         sourceUrl: 'https://blog.test/post',
+        source: expect.objectContaining({
+          articleTitle: expect.any(String),
+          blogName: expect.any(String),
+        }),
       },
-      { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+      { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null, source: null },
     ]);
     expect(response.graph.edges).toHaveLength(1);
   });
@@ -150,6 +190,7 @@ describe('AnswerTechnicalQueryQuery', () => {
       ['grounded', retrievedUrl],
       ['invented', null],
     ]);
+    expect(response.graph.nodes[1]?.source).toBeNull();
   });
 
   it('returns the graph limited to 3 levels from the central node', async () => {

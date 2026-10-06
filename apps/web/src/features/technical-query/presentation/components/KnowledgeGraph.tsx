@@ -24,7 +24,7 @@ export interface KnowledgeGraphProps {
 }
 
 /**
- * Lazy boundary for the React Flow canvas: keeps the visualization library out
+ * Lazy boundary for the D3 canvas: keeps the visualization library out
  * of the initial bundle and off the server render (`ssr: false`).
  */
 export function KnowledgeGraph({ graph }: KnowledgeGraphProps): ReactElement {
