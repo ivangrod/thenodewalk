@@ -1,0 +1,19 @@
+docs/rag/local-pipeline.md
+  s_6bca6af610b94f::t_3abcc9c258a9ec 9-14,24-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "05f5383b958ceb615472b1ee4ed44d2e4f92e876",
+  "prompts": {},
+  "sessions": {
+    "s_6bca6af610b94f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eef6fe070ffeCYfnrvJg7TFEGy",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
