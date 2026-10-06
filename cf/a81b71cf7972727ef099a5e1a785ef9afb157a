@@ -1,0 +1,22 @@
+.gitignore
+  h_a3b97539b00b18 23
+.prettierignore
+  h_a3b97539b00b18 11
+README.md
+  h_a3b97539b00b18 29-32,57-71
+compose.yaml
+  h_a3b97539b00b18 16,30,32
+docs/rag/operations-and-verification.md
+  h_a3b97539b00b18 32-35,165-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cfa81b71cf7972727ef099a5e1a785ef9afb157a",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
