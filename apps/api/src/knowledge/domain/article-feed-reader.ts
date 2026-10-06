@@ -6,7 +6,7 @@ import type { FeedSubscription } from './feed-subscription-reader';
 export interface FeedArticle {
   title: string;
   url: string;
-  publishedAt: string;
+  publishedAt: string | null;
 }
 
 /**

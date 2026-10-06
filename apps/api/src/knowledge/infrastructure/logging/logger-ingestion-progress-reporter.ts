@@ -25,10 +25,10 @@ export class LoggerIngestionProgressReporter implements IngestionProgressReporte
 
   feedCompleted(
     progress: FeedIngestionProgress,
-    totals: { articles: number; chunks: number },
+    totals: { articles: number; chunks: number; skippedArticles?: number },
   ): void {
     this.logger.log(
-      `${this.prefix(progress)} ${progress.blogName}: completed (${totals.articles} articles, ${totals.chunks} chunks)`,
+      `${this.prefix(progress)} ${progress.blogName}: completed (${totals.articles} articles, ${totals.chunks} chunks)${totals.skippedArticles === undefined ? '' : `, ${totals.skippedArticles} articles already ingested`}`,
     );
   }
 

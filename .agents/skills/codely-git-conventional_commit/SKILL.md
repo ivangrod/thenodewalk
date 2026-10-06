@@ -5,7 +5,7 @@ disable-model-invocation: false
 user-invocable: true
 metadata:
   author: Codely <support@codely.com> (https://codely.com)
-  version: "1.0"
+  version: '1.0'
   license: MIT
 ---
 

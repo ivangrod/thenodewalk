@@ -13,7 +13,10 @@ list, and verify the API and web application through the standard test suites.
    database credentials `thenodewalk` / `thenodewalk`. ChromaDB UI is at `http://localhost:8090`;
    connect it to `http://localhost:8000` with tenant `default_tenant` and database
    `default_database`. Compose configures ChromaDB CORS for the UI's local origin.
-3. Copy the API and web example environment files before running the apps.
+3. Copy the API and web example environment files before running the apps. Generate
+   Prisma with `pnpm --filter @thenodewalk/api prisma:generate` and apply the two checked-in
+   migrations with `pnpm --filter @thenodewalk/api prisma:deploy`. PostgreSQL is required
+   for ingestion, but the read-only HTTP API uses a lazy Prisma connection.
 4. Install and run Ollama locally, then pull `nomic-embed-text` for embeddings and
    `llama3.1:8b` for structured graph generation.
 5. Ingest feeds from `../../apps/api/feeds/engineering_blogs_lite.opml` through the API ingestion CLI.
@@ -32,7 +35,9 @@ list, and verify the API and web application through the standard test suites.
    local infrastructure can mean `knowledge_chunks` has no ingested data. ChromaDB persists in
    `data_containers/chromadb`, bind-mounted to `/data` and excluded from Git. Recreating containers
    or deleting Docker volumes preserves these files; deleting the host directory or the
-   collection itself requires ingestion again.
+   collection itself requires ingestion again with `ingest --full`, since PostgreSQL
+   can still contain cursors for vectors that no longer exist. Normal ingestion reads
+   all cursors once, skips dated posts at or before them and always retries undated posts.
 10. Run the mandatory format, lint, architecture, typecheck, unit, and E2E suites before
     considering a change complete.
 
@@ -75,6 +80,8 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 
 pnpm infra:up
+pnpm --filter @thenodewalk/api prisma:generate
+pnpm --filter @thenodewalk/api prisma:deploy
 ollama pull nomic-embed-text
 ollama pull llama3.1:8b
 
@@ -166,7 +173,7 @@ docker inspect thenodewalk-chromadb-1 --format '{{json .Mounts}}'
 # Confirm /data is a bind mount sourced from this project's data_containers/chromadb.
 curl --fail http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database/collections
 # If knowledge_chunks is missing or empty, ingest feeds again.
-pnpm --filter @thenodewalk/api ingest
+pnpm --filter @thenodewalk/api ingest --full
 ```
 
 ### ❌ Bad: Running a query before its local dependencies are ready

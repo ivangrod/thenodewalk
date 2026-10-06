@@ -1,4 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Inject, Module, type OnModuleInit } from '@nestjs/common';
+
+import { EVENT_SUBSCRIBER_REGISTRY } from '../../shared/application/event-bus.token';
+import type { DomainEventSubscriberRegistry } from '../../shared/domain/domain-event-subscriber';
+import { SaveLastPublicationDateCommand } from '../application/save-last-publication-date.command';
+import { SaveLastPublicationDateOnKnowledgeFeedIngested } from '../application/save-last-publication-date-on-knowledge-feed-ingested';
+import { PrismaFeedLastPublicationDateRepository } from './persistence/prisma-feed-last-publication-date.repository';
 
 import { SharedModule } from '../../shared/infrastructure/shared.module';
 import { AnswerTechnicalQueryQuery } from '../application/answer-technical-query.query';
@@ -7,6 +13,7 @@ import {
   ARTICLE_FEED_READER,
   EMBEDDING_GENERATOR,
   FEED_SUBSCRIPTION_READER,
+  FEED_LAST_PUBLICATION_DATE_REPOSITORY,
   INGESTION_PROGRESS_REPORTER,
   KNOWLEDGE_CHUNK_REPOSITORY,
   READABLE_ARTICLE_READER,
@@ -52,6 +59,12 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
   controllers: [TechnicalQueryController],
   providers: [
     IngestFeedsCommand,
+    SaveLastPublicationDateCommand,
+    SaveLastPublicationDateOnKnowledgeFeedIngested,
+    {
+      provide: FEED_LAST_PUBLICATION_DATE_REPOSITORY,
+      useClass: PrismaFeedLastPublicationDateRepository,
+    },
     AnswerTechnicalQueryQuery,
     { provide: FEED_SUBSCRIPTION_READER, useClass: OpmlFeedSubscriptionReader },
     {
@@ -99,4 +112,13 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
   ],
   exports: [IngestFeedsCommand, AnswerTechnicalQueryQuery],
 })
-export class KnowledgeModule {}
+export class KnowledgeModule implements OnModuleInit {
+  constructor(
+    @Inject(EVENT_SUBSCRIBER_REGISTRY) private readonly registry: DomainEventSubscriberRegistry,
+    private readonly subscriber: SaveLastPublicationDateOnKnowledgeFeedIngested,
+  ) {}
+
+  onModuleInit(): void {
+    this.registry.register(this.subscriber);
+  }
+}

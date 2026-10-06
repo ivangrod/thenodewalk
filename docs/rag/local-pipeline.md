@@ -6,8 +6,12 @@ The TechGraph RAG pipeline lives in the `knowledge` context in `apps/api` and st
 fully local:
 
 1. `IngestFeedsCommand` is a Command. It reads OPML subscriptions, fetches RSS entries,
-   extracts readable article text, chunks it, generates embeddings with Ollama, and
-   idempotently upserts the chunks into ChromaDB.
+   loads publication dates from PostgreSQL once into a `Map` keyed by `blogName`, then
+   parses each RSS date once. A pure selector deduplicates URLs, sorts newest first and
+   stops at the stored timestamp. Only strictly newer posts reach Readability and Ollama.
+   Undated/invalid dates are always processed without advancing the cursor; the RSS
+   adapter must never invent a publication date. Chunks are upserted feed by feed,
+   keeping memory bounded to one feed.
 2. Chunk identifiers must be deterministic (`sha256(articleUrl#chunkIndex)`) so a repeat
    ingestion updates the existing vector rather than creating duplicates. Because the id
    derives from the article URL, an article must be ingested at most once per run: ChromaDB
@@ -17,6 +21,14 @@ fully local:
    marked as ingested once their feed succeeds, so a feed that fails halfway does not hide its
    articles from later feeds.
 3. Ingestion publishes `KnowledgeIngestionCompleted` for every completed run and
+   one `KnowledgeFeedIngested` after each successful feed with a known indexed date.
+   Its in-memory subscriber invokes `SaveLastPublicationDateCommand`, which saves the
+   cursor through a repository port and emits `FeedLastPublicationDateSaved`.
+   Subscribers are awaited before CLI shutdown; failures are logged without losing
+   already indexed chunks. The Prisma adapter atomically preserves the greatest date.
+   `--full` bypasses the initial snapshot to recover vectors after ChromaDB data loss.
+   Ambiguous blog names (distinct feed URLs with one name) bypass and do not save cursors.
+   An unchanged feed is successful, not empty. Ingestion also publishes
    `KnowledgeIngestionFailed` for an individual feed failure. A problem with a feed must never
    stop the remaining subscriptions: an `inaccessible` feed (fetching or reading it throws), an
    `empty` feed (read without error but yielding zero chunks, because the RSS has no entries

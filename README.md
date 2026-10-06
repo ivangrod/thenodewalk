@@ -104,10 +104,29 @@ articles into the vector store:
 
 ```sh
 pnpm infra:up
+pnpm --filter @thenodewalk/api prisma:generate
+pnpm --filter @thenodewalk/api prisma:deploy
 pnpm --filter @thenodewalk/api ingest
 # or point it at a different OPML file:
 pnpm --filter @thenodewalk/api ingest path/to/feeds.opml
+# Recover after deleting ChromaDB data, or deliberately rebuild the vectors:
+pnpm --filter @thenodewalk/api ingest --full path/to/feeds.opml
 ```
+
+The ingestion CLI explicitly loads `apps/api/.env`; exported environment
+variables take precedence. Copy `apps/api/.env.example` to `apps/api/.env` before running it.
+Incremental ingestion loads the latest indexed publication date per `blogName` from
+PostgreSQL once, then skips dated posts at or before that date before fetching article
+text or generating embeddings. Posts are sorted newest first, and chunks are saved feed
+by feed. Each successful feed publishes one in-memory event whose subscriber saves the
+latest indexed date in `feed_last_publication_dates`. Subscriber failures are logged and
+retried by the next idempotent ingestion; PostgreSQL must be reachable for the initial read.
+
+Posts without a valid publication date are always ingested and never advance the cursor.
+Distinct feeds sharing a blog name bypass the cursor and report `ambiguous-origin` issues.
+Renaming a blog triggers a full ingestion for that new name. The comparison is strictly
+newer: backdated posts and posts later added with the exact cursor timestamp require `--full`.
+The first run after upgrading reingests existing vectors idempotently to populate dates.
 
 ### Ask a question
 

@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 metadata:
   author: Codely <support@codely.com> (https://codely.com)
-  version: "1.0"
+  version: '1.0'
   license: MIT
 ---
 
@@ -72,6 +72,7 @@ A plan is stored as a **tree of issues**, using GitHub's **native sub-issues** f
 4. Propose the plan to the user for approval. IMPORTANT: Do not create any issue until the user has agreed on the specific contracts to be considered and the implementation phases.
 
 5. **Create one child issue per phase** with `gh issue create`. Each child issue body must contain:
+
    - The phase description.
    - The phase to-do actions as a checkbox list (`- [ ] ...`).
    - The public contracts for that phase.
@@ -91,12 +92,12 @@ A plan is stored as a **tree of issues**, using GitHub's **native sub-issues** f
 7. **Update the parent issue** with `gh issue edit <parent> --body ...` so its body contains the `Goal`, `Context`, agreed design decisions and a `Phases` checklist that links every child issue (`- [ ] #<child> Phase N: <title>`). Preserve the original task description from the parent issue: keep it as-is and append the new plan content below it, separated by a `---` line (do not lose or rewrite the original text).
 
 8. Suggest next steps. Ask the user what do they want to do:
+
    - Do not do anything else.
    - Implement the plan by executing the `/codely-plan_phase-implement-github <parent-issue-url>` skill (implements Phase 1 only).
    - Implement a specific phase by executing the `/codely-plan_phase-implement-github <child-issue-url>` skill.
 
-   > [!IMPORTANT]
-   > `/codely-plan_phase-implement-github` handles one phase per invocation. Never implement all phases at once.
+   > [!IMPORTANT] > `/codely-plan_phase-implement-github` handles one phase per invocation. Never implement all phases at once.
 
 ## 🗃️ Plan metadata
 

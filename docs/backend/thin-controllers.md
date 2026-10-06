@@ -1,21 +1,24 @@
 # Thin NestJS Controllers
 
 ## Convention
+
 API endpoints (NestJS Controllers in the `infrastructure` layer) must be thin. They receive the HTTP request, resolve the appropriate Command or Query from the application layer, execute it, and map the result to an HTTP response. They must **not** contain business logic.
 
 ## Benefits
+
 - Business logic stays testable through unit tests against use cases, without needing HTTP infrastructure.
 - Controllers become trivially simple.
 
 ## Examples
 
 ### ✅ Good: Thin Controller
+
 ```typescript
 @Controller('nodes')
 export class NodeController {
   constructor(
     private readonly createNodeCommand: CreateNodeCommand,
-    private readonly findNodeQuery: FindNodeQuery
+    private readonly findNodeQuery: FindNodeQuery,
   ) {}
 
   @Post()
@@ -26,6 +29,7 @@ export class NodeController {
 ```
 
 ### ❌ Bad: Business logic in Controller
+
 ```typescript
 @Controller('nodes')
 export class NodeController {

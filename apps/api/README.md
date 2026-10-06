@@ -9,6 +9,8 @@ pnpm --filter @thenodewalk/api dev
 pnpm --filter @thenodewalk/api test
 pnpm --filter @thenodewalk/api test:e2e
 pnpm --filter @thenodewalk/api prisma:generate
+pnpm --filter @thenodewalk/api prisma:deploy
+pnpm --filter @thenodewalk/api ingest [--full] [path/to/feeds.opml]
 ```
 
 ## Prisma and Supabase
