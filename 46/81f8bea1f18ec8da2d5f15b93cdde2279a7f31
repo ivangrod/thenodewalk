@@ -1,0 +1,37 @@
+apps/api/src/knowledge/application/answer-technical-query.query.ts
+  s_7f7cc31d895387::t_f22a8bb170b384 6-9,75-81,90-93,96,100-105,112,122-133
+apps/api/src/knowledge/infrastructure/http/technical-query.controller.integration.spec.ts
+  s_7f7cc31d895387::t_533e664051e183 93-97,132-139
+apps/web/e2e/technical-query.spec.ts
+  s_7f7cc31d895387::t_65d292ea7d5f49 12-22,66-67,72-86,92-94,115-160,170,177-184
+apps/web/package.json
+  s_7f7cc31d895387::t_e833520aaa0525 17,22-24,41-43
+apps/web/src/features/technical-query/presentation/components/ArticleSourceDialog.tsx
+  s_7f7cc31d895387::t_4548eef40b1c60 1-86
+apps/web/src/features/technical-query/presentation/components/ConceptNode.tsx
+  s_7f7cc31d895387::t_9b6f23a5ef18f2 3-4,7,11-13,15,18-38,41
+apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.tsx
+  s_7f7cc31d895387::t_3ddbfecfc2a550 3-6,8-10,12-15,18-65,67-72,74-81,83-130,132-181
+patches/d3-graph-react@1.3.1.patch
+  s_7f7cc31d895387::t_17faa947e56888 1-22
+pnpm-lock.yaml
+  s_7f7cc31d895387::t_7e02503f68f848 7-11,143-145,158-166,210-218,1653-1655,1665-1778,1788-1832,2167-2168,2173-2174,2739-2742,3280-3289,3294-3297,3431-3433,4003-4006,5365-5394,6201-6220,7850-7851,7858-7957,7965-7999,8282,8288,8293,8984-8987,9564-9579,9584-9585,9696-9697,10516-10517,12008-12034,12946-12960,12964
+pnpm-workspace.yaml
+  s_7f7cc31d895387::t_ed8ba9d5715b99 15-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4681f8bea1f18ec8da2d5f15b93cdde2279a7f31",
+  "prompts": {},
+  "sessions": {
+    "s_7f7cc31d895387": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eee87f44bffe3KubRheWd9TjND",
+        "model": "claude-opus-5.5"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
