@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 metadata:
   author: Codely <support@codely.com> (https://codely.com)
-  version: "1.0"
+  version: '1.0'
   license: MIT
 ---
 
@@ -14,8 +14,7 @@ metadata:
 > [!CRITICAL]
 > Implement **ONLY ONE phase** per invocation. After completing the current phase, **STOP** and wait for the user to review the changes. Never proceed to the next phase without explicit user approval.
 
-> [!CRITICAL]
-> **Never merge the pull request.** This skill may create a feature branch, commit, push and open a pull request, but the user decides when to merge. Merging is what closes the phase issue.
+> [!CRITICAL] > **Never merge the pull request.** This skill may create a feature branch, commit, push and open a pull request, but the user decides when to merge. Merging is what closes the phase issue.
 
 ## 🎯 Input
 

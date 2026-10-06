@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 metadata:
   author: Codely <support@codely.com> (https://codely.com)
-  version: "1.0"
+  version: '1.0'
   license: MIT
 ---
 
@@ -26,11 +26,12 @@ The structure of a plan, its sections and the rules to shape them are defined in
 6. Save the plan in a new file inside a subfolder of `.agents/plans` with the current date and a semantic name based on the task description. The structure is: `.agents/plans/{plan-name}/{plan-name}-plan.md`. Example: `2026_01_16-create_embeddable_changelog_widget/2026_01_16-create_embeddable_changelog_widget-plan.md`.
 
 7. Suggest next steps
-    - Once you create the plan file, ask the user what do they want to do:
-        - Do not do anything else.
-        - Commit the plan file to the repository by running the `/codely-git-conventional_commit` skill. Consider plan file only changes as `docs` type.
-        - Implement the plan by running the `/codely-plan_phase-implement @plan-file-path` skill.
-        - Commit the plan file and then implement Phase 1 only.
+
+   - Once you create the plan file, ask the user what do they want to do:
+     - Do not do anything else.
+     - Commit the plan file to the repository by running the `/codely-git-conventional_commit` skill. Consider plan file only changes as `docs` type.
+     - Implement the plan by running the `/codely-plan_phase-implement @plan-file-path` skill.
+     - Commit the plan file and then implement Phase 1 only.
 
    > [!IMPORTANT]
    > If the user asks to "commit and implement", commit the plan file first, then implement **only Phase 1**. Never implement all phases at once. The `/codely-plan_phase-implement` skill handles one phase per invocation.
@@ -53,16 +54,16 @@ The plan file should contain the following frontmatter:
 
 ```markdown
 ---
-name: "{ plan_name }"
-description: "{ plan_description }"
-created_at: "{ current_date }"
+name: '{ plan_name }'
+description: '{ plan_description }'
+created_at: '{ current_date }'
 
 created_by:
-  tool: "{ tool }"
+  tool: '{ tool }'
   model:
-    name: "{ model.name }"
-    version: "{ model.version }"
-    reasoning_effort: "{ model.reasoning_effort }"
+    name: '{ model.name }'
+    version: '{ model.version }'
+    reasoning_effort: '{ model.reasoning_effort }'
 ---
 ```
 

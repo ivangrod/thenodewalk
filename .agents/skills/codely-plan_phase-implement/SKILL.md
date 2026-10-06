@@ -5,7 +5,7 @@ disable-model-invocation: true
 user-invocable: true
 metadata:
   author: Codely <support@codely.com> (https://codely.com)
-  version: "1.0"
+  version: '1.0'
   license: MIT
 ---
 
@@ -14,8 +14,7 @@ metadata:
 > [!CRITICAL]
 > Implement **ONLY ONE phase** per invocation. After completing the current phase, **STOP** and wait for the user to review the changes. Never proceed to the next phase without explicit user approval.
 
-> [!CRITICAL]
-> **Never commit or push changes automatically.** Only suggest commit messages. The user decides when to commit.
+> [!CRITICAL] > **Never commit or push changes automatically.** Only suggest commit messages. The user decides when to commit.
 
 ## 🔍 Determining the current phase
 
@@ -39,14 +38,14 @@ Do not modify the current plan file frontmatter, only add or update the followin
 ```markdown
 ---
 implemented_by:
-  tool: "{ tool }"
+  tool: '{ tool }'
   model:
-    name: "{ model.name }"
-    version: "{ model.version }"
-    reasoning_effort: "{ model.reasoning_effort }"
+    name: '{ model.name }'
+    version: '{ model.version }'
+    reasoning_effort: '{ model.reasoning_effort }'
 
-last_implementation_at: "{ current_date }"
-has_completed_all_phases: "{ true | false }"
+last_implementation_at: '{ current_date }'
+has_completed_all_phases: '{ true | false }'
 ---
 ```
 

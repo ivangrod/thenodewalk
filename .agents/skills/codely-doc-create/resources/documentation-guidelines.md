@@ -57,12 +57,15 @@ Doc created by 🐢 💨 (Turbotuga™, [Codely](https://codely.com)’s mascot)
 # Project Guidelines
 
 ## Architecture
+
 We use hexagonal architecture...
 
 ## Testing
+
 Use object mothers...
 
 ## Database
+
 PostgreSQL with pgvector...
 ```
 
