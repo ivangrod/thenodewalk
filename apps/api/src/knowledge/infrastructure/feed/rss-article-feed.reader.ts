@@ -19,10 +19,11 @@ export class RssArticleFeedReader implements ArticleFeedReader {
         return articles;
       }
 
+      const date = Date.parse(item.isoDate ?? item.pubDate ?? '');
       articles.push({
         title: item.title ?? 'Untitled',
         url: item.link,
-        publishedAt: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
+        publishedAt: Number.isFinite(date) ? new Date(date).toISOString() : null,
       });
       return articles;
     }, []);

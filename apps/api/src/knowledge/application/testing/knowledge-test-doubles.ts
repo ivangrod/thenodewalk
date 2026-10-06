@@ -19,13 +19,42 @@ import type { GeneratedGraph } from '../../domain/knowledge-graph';
 import { EMPTY_GRAPH } from '../../domain/knowledge-graph';
 import type { ReadableArticleReader } from '../../domain/readable-article-reader';
 import type { StructuredGraphGenerator } from '../../domain/structured-graph-generator';
+import type { FeedLastPublicationDate } from '../../domain/feed-last-publication-date';
+import type { FeedLastPublicationDateRepository } from '../../domain/feed-last-publication-date-repository';
+
+export class InMemoryFeedLastPublicationDateRepository
+  implements FeedLastPublicationDateRepository
+{
+  readonly store = new Map<string, FeedLastPublicationDate & { feedUrl: string }>();
+  findAllCalls = 0;
+
+  constructor(records: FeedLastPublicationDate[] = []) {
+    for (const record of records) this.store.set(record.blogName, { ...record, feedUrl: '' });
+  }
+
+  findAll(): Promise<FeedLastPublicationDate[]> {
+    this.findAllCalls += 1;
+    return Promise.resolve([...this.store.values()]);
+  }
+
+  save(record: FeedLastPublicationDate & { feedUrl: string }): Promise<void> {
+    const previous = this.store.get(record.blogName);
+    if (
+      previous === undefined ||
+      Date.parse(previous.lastPublishedAt) < Date.parse(record.lastPublishedAt)
+    ) {
+      this.store.set(record.blogName, record);
+    }
+    return Promise.resolve();
+  }
+}
 
 export type FeedProgressReport =
   | { status: 'in progress'; progress: FeedIngestionProgress }
   | {
       status: 'completed';
       progress: FeedIngestionProgress;
-      totals: { articles: number; chunks: number };
+      totals: { articles: number; chunks: number; skippedArticles?: number };
     }
   | { status: 'failed'; progress: FeedIngestionProgress; reason: string };
 
@@ -53,6 +82,7 @@ export class StubArticleFeedReader implements ArticleFeedReader {
 }
 
 export class StubReadableArticleReader implements ReadableArticleReader {
+  readonly calls: string[] = [];
   constructor(
     private readonly textByUrl: Map<string, string> = new Map(),
     private readonly defaultText = '',
@@ -60,6 +90,7 @@ export class StubReadableArticleReader implements ReadableArticleReader {
   ) {}
 
   read(articleUrl: string): Promise<string> {
+    this.calls.push(articleUrl);
     const failure = this.failuresByUrl.get(articleUrl);
     if (failure !== undefined) {
       return Promise.reject(failure);
@@ -84,8 +115,10 @@ export class InMemoryKnowledgeChunkRepository implements KnowledgeChunkRepositor
   readonly searchCalls: { embedding: number[]; limit: number }[] = [];
   readonly store = new Map<string, KnowledgeChunk>();
   matches: KnowledgeSearchMatch[] = [];
+  failure?: Error;
 
   upsert(chunks: KnowledgeChunk[]): Promise<void> {
+    if (this.failure !== undefined) return Promise.reject(this.failure);
     this.upsertCalls.push(chunks);
     for (const chunk of chunks) {
       this.store.set(chunk.id, chunk);
@@ -125,7 +158,7 @@ export class RecordingIngestionProgressReporter implements IngestionProgressRepo
 
   feedCompleted(
     progress: FeedIngestionProgress,
-    totals: { articles: number; chunks: number },
+    totals: { articles: number; chunks: number; skippedArticles?: number },
   ): void {
     this.reports.push({ status: 'completed', progress, totals });
   }

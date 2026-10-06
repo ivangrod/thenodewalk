@@ -4,11 +4,13 @@ import request from 'supertest';
 
 import {
   EMBEDDING_GENERATOR,
+  FEED_LAST_PUBLICATION_DATE_REPOSITORY,
   KNOWLEDGE_CHUNK_REPOSITORY,
   STRUCTURED_GRAPH_GENERATOR,
 } from '../../application/knowledge.tokens';
 import {
   InMemoryKnowledgeChunkRepository,
+  InMemoryFeedLastPublicationDateRepository,
   StubEmbeddingGenerator,
   StubStructuredGraphGenerator,
 } from '../../application/testing/knowledge-test-doubles';
@@ -27,6 +29,8 @@ describe('POST /technical-queries (integration)', () => {
     embeddings = new StubEmbeddingGenerator([0.1, 0.2, 0.3]);
 
     const moduleRef = await Test.createTestingModule({ imports: [KnowledgeModule] })
+      .overrideProvider(FEED_LAST_PUBLICATION_DATE_REPOSITORY)
+      .useValue(new InMemoryFeedLastPublicationDateRepository())
       .overrideProvider(EMBEDDING_GENERATOR)
       .useValue(embeddings)
       .overrideProvider(KNOWLEDGE_CHUNK_REPOSITORY)

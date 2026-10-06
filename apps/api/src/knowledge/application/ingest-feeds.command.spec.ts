@@ -1,6 +1,7 @@
 import { IngestFeedsCommand } from './ingest-feeds.command';
 import {
   InMemoryKnowledgeChunkRepository,
+  InMemoryFeedLastPublicationDateRepository,
   RecordingEventBus,
   RecordingIngestionProgressReporter,
   StubArticleFeedReader,
@@ -10,6 +11,8 @@ import {
 } from './testing/knowledge-test-doubles';
 import type { KnowledgeIngestionCompleted } from '../domain/events/knowledge-ingestion-completed';
 import type { KnowledgeIngestionFailed } from '../domain/events/knowledge-ingestion-failed';
+import type { KnowledgeFeedIngested } from '../domain/events/knowledge-feed-ingested';
+import type { FeedLastPublicationDate } from '../domain/feed-last-publication-date';
 import type { FeedArticle } from '../domain/article-feed-reader';
 import type { FeedSubscription } from '../domain/feed-subscription-reader';
 import { chunkText } from '../domain/text-chunker';
@@ -25,6 +28,7 @@ interface Scenario {
   textByUrl?: Map<string, string>;
   defaultText?: string;
   articleFailuresByUrl?: Map<string, Error>;
+  publicationDates?: FeedLastPublicationDate[];
 }
 
 function buildCommand(scenario: Scenario): {
@@ -33,29 +37,169 @@ function buildCommand(scenario: Scenario): {
   eventBus: RecordingEventBus;
   embeddings: StubEmbeddingGenerator;
   progress: RecordingIngestionProgressReporter;
+  publicationDates: InMemoryFeedLastPublicationDateRepository;
+  readableArticle: StubReadableArticleReader;
 } {
   const repository = new InMemoryKnowledgeChunkRepository();
   const eventBus = new RecordingEventBus();
   const embeddings = new StubEmbeddingGenerator(EMBEDDING);
   const progress = new RecordingIngestionProgressReporter();
+  const publicationDates = new InMemoryFeedLastPublicationDateRepository(scenario.publicationDates);
+  const readableArticle = new StubReadableArticleReader(
+    scenario.textByUrl,
+    scenario.defaultText,
+    scenario.articleFailuresByUrl,
+  );
   const command = new IngestFeedsCommand(
     new StubFeedSubscriptionReader(scenario.subscriptions),
     new StubArticleFeedReader(scenario.articlesByFeedUrl, scenario.failuresByFeedUrl),
-    new StubReadableArticleReader(
-      scenario.textByUrl,
-      scenario.defaultText,
-      scenario.articleFailuresByUrl,
-    ),
+    readableArticle,
     embeddings,
     repository,
     eventBus,
     progress,
+    publicationDates,
   );
 
-  return { command, repository, eventBus, embeddings, progress };
+  return { command, repository, eventBus, embeddings, progress, publicationDates, readableArticle };
 }
 
 describe('IngestFeedsCommand', () => {
+  it('loads dates once and skips old posts before extraction or embedding', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const old = FeedArticleMother.create({ publishedAt: '2026-01-01T00:00:00Z' });
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [old]]]),
+      publicationDates: [
+        { blogName: subscription.blogName, lastPublishedAt: old.publishedAt ?? '' },
+      ],
+      defaultText: 'old content',
+    });
+    const result = await scenario.command.execute(OPML_PATH);
+    expect(result).toMatchObject({
+      processedArticles: 0,
+      skippedArticles: 1,
+      indexedChunks: 0,
+      issues: [],
+    });
+    expect(scenario.publicationDates.findAllCalls).toBe(1);
+    expect(scenario.readableArticle.calls).toEqual([]);
+    expect(scenario.embeddings.prompts).toEqual([]);
+    expect(scenario.repository.upsertCalls).toEqual([]);
+    expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
+  });
+
+  it('emits one event after storing a feed, using only dates of indexed posts', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const articles = [
+      FeedArticleMother.create({ publishedAt: '2026-01-01T00:00:00Z' }),
+      FeedArticleMother.create({ publishedAt: '2026-01-03T00:00:00Z' }),
+      FeedArticleMother.create({ publishedAt: '2026-01-02T00:00:00Z' }),
+    ];
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, articles]]),
+      defaultText: 'indexed content',
+      textByUrl: new Map([[articles[1]!.url, '']]),
+    });
+    const publish = jest.spyOn(scenario.eventBus, 'publish');
+    publish.mockImplementation(async (events): Promise<void> => {
+      if (events.some((event) => event.eventName === 'knowledge.feed.ingested')) {
+        expect(scenario.repository.store.size).toBe(2);
+      }
+      scenario.eventBus.published.push(...events);
+    });
+    await scenario.command.execute(OPML_PATH);
+    const events = scenario.eventBus.ofType<KnowledgeFeedIngested>('knowledge.feed.ingested');
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      blogName: subscription.blogName,
+      lastPublishedAt: '2026-01-02T00:00:00.000Z',
+    });
+    expect(scenario.readableArticle.calls).toEqual([
+      articles[1]!.url,
+      articles[2]!.url,
+      articles[0]!.url,
+    ]);
+  });
+
+  it('does not advance a publication date if Chroma storage fails', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [FeedArticleMother.create()]]]),
+      defaultText: 'content',
+    });
+    scenario.repository.failure = new Error('Chroma unavailable');
+    const result = await scenario.command.execute(OPML_PATH);
+    expect(result.processedFeeds).toBe(0);
+    expect(result.indexedChunks).toBe(0);
+    expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
+    expect(result.issues[0]?.reason).toBe('Chroma unavailable');
+  });
+
+  it('reingests everything with --full without loading the saved snapshot', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const article = FeedArticleMother.create({ publishedAt: '2026-01-01T00:00:00Z' });
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [article]]]),
+      publicationDates: [
+        { blogName: subscription.blogName, lastPublishedAt: '2026-02-01T00:00:00Z' },
+      ],
+      defaultText: 'content',
+    });
+    expect((await scenario.command.execute(OPML_PATH, { full: true })).indexedChunks).toBe(1);
+    expect(scenario.publicationDates.findAllCalls).toBe(0);
+    expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toHaveLength(1);
+  });
+
+  it('always ingests undated posts without saving an invented publication date', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([
+        [subscription.feedUrl, [FeedArticleMother.create({ publishedAt: null })]],
+      ]),
+      defaultText: 'undated content',
+    });
+    await scenario.command.execute(OPML_PATH);
+    expect(scenario.repository.lastUpsert[0]?.metadata.publishedAt).toBe('');
+    expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
+  });
+
+  it('fully ingests ambiguous blog names without reading or advancing their cursor', async () => {
+    const first = FeedSubscriptionMother.create({ blogName: 'Shared name' });
+    const second = FeedSubscriptionMother.create({ blogName: 'Shared name' });
+    const scenario = buildCommand({
+      subscriptions: [first, second],
+      publicationDates: [{ blogName: first.blogName, lastPublishedAt: '2027-01-01T00:00:00Z' }],
+      articlesByFeedUrl: new Map([
+        [first.feedUrl, [FeedArticleMother.create({ publishedAt: '2026-01-01T00:00:00Z' })]],
+        [second.feedUrl, [FeedArticleMother.create({ publishedAt: '2026-01-02T00:00:00Z' })]],
+      ]),
+      defaultText: 'content',
+    });
+    const result = await scenario.command.execute(OPML_PATH);
+    expect(result.indexedChunks).toBe(2);
+    expect(scenario.repository.upsertCalls).toHaveLength(2);
+    expect(result.issues.map((issue) => issue.type)).toEqual([
+      'ambiguous-origin',
+      'ambiguous-origin',
+    ]);
+    expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
+  });
+
+  it('fails before fetching RSS when the initial PostgreSQL read fails', async () => {
+    const scenario = buildCommand({ subscriptions: [FeedSubscriptionMother.create()] });
+    jest
+      .spyOn(scenario.publicationDates, 'findAll')
+      .mockRejectedValue(new Error('PostgreSQL unavailable'));
+    await expect(scenario.command.execute(OPML_PATH)).rejects.toThrow('PostgreSQL unavailable');
+    expect(scenario.progress.reports).toEqual([]);
+  });
+
   it('parses OPML feeds and processes every subscribed article', async () => {
     const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
     const article = FeedArticleMother.create({ url: 'https://blog.test/post-1' });
@@ -233,7 +377,7 @@ describe('IngestFeedsCommand', () => {
           blogName: subscription.blogName,
           feedUrl: subscription.feedUrl,
         },
-        totals: { articles: 2, chunks: 2 },
+        totals: { articles: 2, chunks: 2, skippedArticles: 0 },
       },
     ]);
   });

@@ -13,14 +13,19 @@ const DEFAULT_OPML_PATH = 'feeds/engineering_blogs.opml';
 /**
  * Runnable ingestion entrypoint. Usage:
  *
- *   pnpm --filter @thenodewalk/api ingest [path/to/feeds.opml]
+ *   pnpm --filter @thenodewalk/api ingest [--full] [path/to/feeds.opml]
  *
- * Requires ChromaDB (`pnpm infra:up`) and Ollama running locally with the
+ * Requires migrated PostgreSQL, ChromaDB (`pnpm infra:up`) and Ollama running locally with the
  * embedding model pulled.
  */
 async function run(): Promise<void> {
   const logger = new Logger('IngestFeedsCli');
-  const opmlPath = resolve(process.argv[2] ?? DEFAULT_OPML_PATH);
+  const args = process.argv.slice(2);
+  const paths = args.filter((argument) => argument !== '--full');
+  if (paths.length > 1 || paths.some((argument) => argument.startsWith('--'))) {
+    throw new Error('Usage: ingest [--full] [path/to/feeds.opml]');
+  }
+  const opmlPath = resolve(paths[0] ?? DEFAULT_OPML_PATH);
 
   const context = await NestFactory.createApplicationContext(KnowledgeModule, {
     logger: ['log', 'warn', 'error'],
@@ -28,9 +33,11 @@ async function run(): Promise<void> {
 
   try {
     logger.log(`Ingesting feeds from ${opmlPath}`);
-    const result = await context.get(IngestFeedsCommand).execute(opmlPath);
+    const result = await context
+      .get(IngestFeedsCommand)
+      .execute(opmlPath, { full: args.includes('--full') });
     logger.log(
-      `Done: ${result.processedFeeds} feeds, ${result.processedArticles} articles, ${result.indexedChunks} chunks indexed.`,
+      `Done: ${result.processedFeeds} feeds, ${result.processedArticles} articles, ${result.indexedChunks} chunks indexed, ${result.skippedArticles} articles already ingested.`,
     );
 
     if (result.issues.length > 0) {
