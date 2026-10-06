@@ -85,7 +85,7 @@ describe('IngestFeedsCommand', () => {
     });
     expect(scenario.publicationDates.findAllCalls).toBe(1);
     expect(scenario.readableArticle.calls).toEqual([]);
-    expect(scenario.embeddings.prompts).toEqual([]);
+    expect(scenario.embeddings.documentBatches).toEqual([]);
     expect(scenario.repository.upsertCalls).toEqual([]);
     expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
   });
@@ -253,7 +253,7 @@ describe('IngestFeedsCommand', () => {
   it('upserts every chunk with its generated embedding', async () => {
     const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
     const article = FeedArticleMother.create({ url: 'https://blog.test/post-1' });
-    const { command, repository, embeddings } = buildCommand({
+    const { command, repository } = buildCommand({
       subscriptions: [subscription],
       articlesByFeedUrl: new Map([[subscription.feedUrl, [article]]]),
       textByUrl: new Map([[article.url, 'embed this content']]),
@@ -262,7 +262,67 @@ describe('IngestFeedsCommand', () => {
     await command.execute(OPML_PATH);
 
     expect(repository.lastUpsert[0]?.embedding).toEqual(EMBEDDING);
-    expect(embeddings.prompts).toContain('embed this content');
+  });
+
+  it('embeds every chunk as a document, without the article title', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const article = FeedArticleMother.create({
+      url: 'https://blog.test/kafka',
+      title: 'Running Kafka at scale',
+    });
+    const { command, embeddings } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [article]]]),
+      textByUrl: new Map([[article.url, 'Partitions spread the load across brokers.']]),
+    });
+
+    await command.execute(OPML_PATH);
+
+    expect(embeddings.documents).toEqual(['Partitions spread the load across brokers.']);
+    expect(embeddings.queries).toEqual([]);
+  });
+
+  it('embeds all the chunks of an article in a single request', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const articles = [
+      FeedArticleMother.create({
+        url: 'https://blog.test/long',
+        publishedAt: '2026-01-02T00:00:00Z',
+      }),
+      FeedArticleMother.create({
+        url: 'https://blog.test/short',
+        publishedAt: '2026-01-01T00:00:00Z',
+      }),
+    ];
+    const longText = Array.from({ length: 800 }, (_, index) => `word${index}`).join(' ');
+    const { command, embeddings } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, articles]]),
+      textByUrl: new Map([
+        [articles[0]!.url, longText],
+        [articles[1]!.url, 'short content'],
+      ]),
+    });
+
+    await command.execute(OPML_PATH);
+
+    expect(embeddings.documentBatches.map((batch) => batch.length)).toEqual([
+      chunkText(longText).length,
+      1,
+    ]);
+  });
+
+  it('does not request embeddings for an article without readable text', async () => {
+    const subscription = FeedSubscriptionMother.create({ feedUrl: 'https://blog.test/feed' });
+    const { command, embeddings } = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [FeedArticleMother.create()]]]),
+      defaultText: '',
+    });
+
+    await command.execute(OPML_PATH);
+
+    expect(embeddings.documentBatches).toEqual([]);
   });
 
   it('is idempotent on re-run: the same article yields the same chunk ids', async () => {

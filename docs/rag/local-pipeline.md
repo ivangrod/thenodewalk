@@ -36,8 +36,9 @@ fully local:
    declared earlier in the OPML) are all collected into `IngestionResult.issues` instead, so
    the run ends with a full summary. A feed whose articles were all ingested through an
    earlier feed is not `empty`: its content is indexed.
-4. `AnswerTechnicalQueryQuery` is a read-only Query. It embeds the question once, retrieves
-   the Top-K `KnowledgeSearchMatch` values, and must not mutate state or publish events.
+4. `AnswerTechnicalQueryQuery` is a read-only Query. It embeds the question once with
+   `embedQuery`, retrieves the Top-K `KnowledgeSearchMatch` values, and must not mutate state
+   or publish events.
 5. A `StructuredGraphGenerator` receives the query plus traceable chunks (document text and
    source URL) and returns a summary and graph. Its Ollama adapter uses a versioned system
    prompt, JSON mode, deterministic generation, and runtime validation before the answer
@@ -50,7 +51,11 @@ fully local:
 8. Chroma collections store precomputed vectors only. Resolve them with the explicit
    `PrecomputedEmbeddingFunction` guard so the SDK never falls back to its
    `DefaultEmbeddingFunction`, and do not install `@chroma-core/default-embed`. Embeddings are
-   produced exclusively through the `EmbeddingGenerator` port. The Chroma adapter splits
+   produced exclusively through the `EmbeddingGenerator` port. Collections are created with the
+   `cosine` distance (`KNOWLEDGE_CHUNKS_SPACE`), and the provider rejects an existing collection
+   with any other distance through `IncompatibleKnowledgeCollectionError`, because ChromaDB
+   ignores the requested configuration when the collection already exists. A match `score` is the
+   cosine similarity (`1 - distance`). The Chroma adapter splits
    upserts into batches of `CHROMA_UPSERT_BATCH_SIZE` (500), below the server's
    `max_batch_size` (5461, see `GET /api/v2/pre-flight-checks`), because a full OPML run
    produces far more chunks than a single request accepts.
@@ -77,6 +82,17 @@ fully local:
     `OLLAMA_LLM_KEEP_ALIVE`. The API must not depend on the global Ollama "Context length"
     setting: a 128k window makes `llama3.1:8b` reserve a 16 GiB KV cache and freezes the host.
     Invalid values fail when the API boots.
+13. Documents and queries are embedded asymmetrically through two methods of the
+    `EmbeddingGenerator` port: `embedDocuments` (ingestion, one request per article) and
+    `embedQuery` (questions). Ingestion embeds the raw chunk. Do not prepend the article title:
+    it makes the chunks of one post so similar that a single post fills the Top-K, which leaves
+    the graph with fewer sources and no relevance gain. The Ollama adapter calls `/api/embed`, which
+    returns L2-normalized vectors, and never the deprecated `/api/embeddings`, whose vectors keep
+    an arbitrary norm. It prepends the task prefixes of the model (`search_document: ` and
+    `search_query: ` for `nomic-embed-text`, resolved by `embeddingTaskPrefixesFor`) and
+    truncates texts longer than the model context. Changing any part of this scheme (model,
+    prefixes, embedded text, or distance) invalidates every stored vector: delete the
+    collection and run `ingest --full`.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
@@ -101,6 +117,9 @@ exposes `centralNodeId: string | null`, which is `null` only when the graph has 
   requiring someone to scroll back through per-feed log lines to notice a silent gap.
 - Keeps memory use and latency of `/ask` predictable on any machine and avoids reloading the
   model between consecutive queries.
+- Ranks chunks by meaning only: with normalized vectors, task prefixes, and the cosine distance,
+  neither the vector norm nor the embedding endpoint used by a client can push unrelated chunks
+  to the top, and a stale collection fails loudly instead of returning noise.
 
 ## Examples
 
@@ -117,11 +136,11 @@ export class IngestFeedsCommand {
 
   async execute(opmlPath: string): Promise<IngestionResult> {
     // Read subscriptions, fetch articles, extract text and chunk it.
-    const embedding = await this.embeddings.generate(document);
+    const embeddings = await this.embeddings.embedDocuments(documents); // One request per article.
     chunks.push(
       createKnowledgeChunk({
         document,
-        embedding,
+        embedding: embeddings[chunkIndex],
         metadata: { articleUrl, chunkIndex, ...metadata },
       }),
     );
@@ -136,7 +155,7 @@ export class IngestFeedsCommand {
 
 ```typescript
 async execute(query: string): Promise<TechnicalQueryResponse> {
-  const embedding = await this.embeddings.generate(query);
+  const embedding = await this.embeddings.embedQuery(query);
   const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
 
   const [mainMatch] = matches;
@@ -277,15 +296,47 @@ await collection.upsert({ ids: allRunChunks.map((chunk) => chunk.id) /* ... */ }
 this.client.getOrCreateCollection({
   name: this.collectionName,
   embeddingFunction: new PrecomputedEmbeddingFunction(),
+  configuration: { hnsw: { space: KNOWLEDGE_CHUNKS_SPACE } }, // 'cosine'
 });
+// An existing collection keeps its own distance, so the provider then checks
+// `collection.configuration` and throws IncompatibleKnowledgeCollectionError unless it is cosine.
 ```
 
 ### ❌ Bad: Letting Chroma fall back to its default embedding function
 
 ```typescript
 // Tries to load @chroma-core/default-embed, logs a warning and stores a misleading
-// "default" embedding function in the collection configuration.
+// "default" embedding function in the collection configuration. It also creates the
+// collection with Chroma's default `l2` distance.
 this.client.getOrCreateCollection({ name: this.collectionName });
+```
+
+### ✅ Good: Asymmetric, normalized embeddings with the model's task prefixes
+
+```typescript
+// Ingestion: one /api/embed request per article.
+await this.client.embed({
+  model: 'nomic-embed-text',
+  input: documents.map((text) => `search_document: ${text}`),
+  truncate: true,
+});
+// Query: the same endpoint with the query prefix.
+await this.client.embed({
+  model: 'nomic-embed-text',
+  input: [`search_query: ${query}`],
+  truncate: true,
+});
+```
+
+### ❌ Bad: Unnormalized vectors without prefixes in an `l2` collection
+
+```typescript
+// /api/embeddings returns vectors with norms around 14-20. In an l2 collection the
+// norm dominates the distance, so any client that embeds the question with /api/embed
+// (norm 1) gets the chunks with the smallest norm, mostly code, whatever it asks.
+// "Is Kafka recommended for event-driven architecture?" returned SQLite, LiveKit and
+// AI-agent posts from a 47k-chunk collection.
+const { embedding } = await this.client.embeddings({ model: 'nomic-embed-text', prompt: text });
 ```
 
 ### ✅ Good: Report feed progress through a port
@@ -352,6 +403,9 @@ export class RssArticleFeedReader {
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`
 - Chroma collection guard: `apps/api/src/knowledge/infrastructure/chroma/precomputed-embedding-function.ts` and `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`
+- Cosine distance and stale-collection guard: `KNOWLEDGE_CHUNKS_SPACE` and `IncompatibleKnowledgeCollectionError` in `apps/api/src/knowledge/infrastructure/chroma/chroma-collection.provider.ts`, checked up front by `apps/api/src/knowledge/infrastructure/cli/ingest.ts` through `CHROMA_COLLECTION_PROVIDER`
+- Asymmetric embedding port: `apps/api/src/knowledge/domain/embedding-generator.ts`
+- `/api/embed` adapter and task prefixes: `embeddingTaskPrefixesFor` in `apps/api/src/knowledge/infrastructure/ollama/ollama-embedding-generator.ts`
 - Batched Chroma upserts: `CHROMA_UPSERT_BATCH_SIZE` in `apps/api/src/knowledge/infrastructure/chroma/chroma-knowledge-chunk.repository.ts`
 - Duplicate feeds and articles per run: `splitDuplicateSubscriptions` and `ingestSubscription` in `apps/api/src/knowledge/application/ingest-feeds.command.ts`
 - Feed progress port and logger adapter: `apps/api/src/knowledge/domain/ingestion-progress-reporter.ts` and `apps/api/src/knowledge/infrastructure/logging/logger-ingestion-progress-reporter.ts`

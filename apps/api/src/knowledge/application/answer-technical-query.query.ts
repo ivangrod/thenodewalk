@@ -53,7 +53,7 @@ export class AnswerTechnicalQueryQuery {
   ) {}
 
   async execute(query: string): Promise<TechnicalQueryResponse> {
-    const embedding = await this.embeddings.generate(query);
+    const embedding = await this.embeddings.embedQuery(query);
     const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
 
     const [mainMatch] = matches;

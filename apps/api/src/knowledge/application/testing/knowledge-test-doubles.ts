@@ -100,12 +100,23 @@ export class StubReadableArticleReader implements ReadableArticleReader {
 }
 
 export class StubEmbeddingGenerator implements EmbeddingGenerator {
-  readonly prompts: string[] = [];
+  /** Every `embedDocuments` call, keeping the texts of each batch together. */
+  readonly documentBatches: string[][] = [];
+  readonly queries: string[] = [];
 
   constructor(private readonly embedding: number[] = [0.1, 0.2, 0.3]) {}
 
-  generate(text: string): Promise<number[]> {
-    this.prompts.push(text);
+  get documents(): string[] {
+    return this.documentBatches.flat();
+  }
+
+  embedDocuments(documents: string[]): Promise<number[][]> {
+    this.documentBatches.push(documents);
+    return Promise.resolve(documents.map(() => [...this.embedding]));
+  }
+
+  embedQuery(query: string): Promise<number[]> {
+    this.queries.push(query);
     return Promise.resolve([...this.embedding]);
   }
 }

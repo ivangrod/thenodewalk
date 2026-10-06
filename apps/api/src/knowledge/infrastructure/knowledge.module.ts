@@ -27,8 +27,10 @@ import type { ReadableArticleReader } from '../domain/readable-article-reader';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
 import { ReadabilityArticleReader } from './article/readability-article.reader';
 import {
+  CHROMA_COLLECTION_PROVIDER,
   ChromaClientCollectionProvider,
   chromaClientArgsFromUrl,
+  type ChromaCollectionProvider,
 } from './chroma/chroma-collection.provider';
 import {
   ChromaKnowledgeChunkRepository,
@@ -84,14 +86,18 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
         ),
     },
     {
-      provide: KNOWLEDGE_CHUNK_REPOSITORY,
-      useFactory: (): KnowledgeChunkRepository =>
-        new ChromaKnowledgeChunkRepository(
-          new ChromaClientCollectionProvider(
-            new ChromaClient(chromaClientArgsFromUrl(process.env.CHROMA_URL ?? DEFAULT_CHROMA_URL)),
-            KNOWLEDGE_CHUNKS_COLLECTION,
-          ),
+      provide: CHROMA_COLLECTION_PROVIDER,
+      useFactory: (): ChromaCollectionProvider =>
+        new ChromaClientCollectionProvider(
+          new ChromaClient(chromaClientArgsFromUrl(process.env.CHROMA_URL ?? DEFAULT_CHROMA_URL)),
+          KNOWLEDGE_CHUNKS_COLLECTION,
         ),
+    },
+    {
+      provide: KNOWLEDGE_CHUNK_REPOSITORY,
+      useFactory: (collections: ChromaCollectionProvider): KnowledgeChunkRepository =>
+        new ChromaKnowledgeChunkRepository(collections),
+      inject: [CHROMA_COLLECTION_PROVIDER],
     },
     {
       provide: STRUCTURED_GRAPH_GENERATOR,

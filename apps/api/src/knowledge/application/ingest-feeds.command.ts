@@ -60,7 +60,7 @@ export interface FeedIngestionIssue {
  * Command that ingests the blogs declared in an OPML file into the vector store.
  *
  * For each subscription it fetches the RSS articles, extracts the readable text,
- * splits it into chunks, embeds them and collects deterministic
+ * splits it into chunks, embeds them (one request per article) and collects deterministic
  * {@link KnowledgeChunk}s. Chunks are upserted idempotently per feed before publishing
  * {@link KnowledgeFeedIngested}. The PostgreSQL cursor snapshot is loaded once and
  * filtering happens before extraction or embedding. A failed feed is
@@ -255,8 +255,17 @@ export class IngestFeedsCommand {
       const text = await this.readableArticle.read(article.url);
 
       const documents = chunkText(text);
+      if (documents.length === 0) {
+        continue; // No readable text: nothing to embed or store.
+      }
+      // One request per article. The raw chunk is embedded: prepending the article
+      // title makes chunks of the same post so alike that they crowd out other posts.
+      const embeddings = await this.embeddings.embedDocuments(documents);
       for (const [chunkIndex, document] of documents.entries()) {
-        const embedding = await this.embeddings.generate(document);
+        const embedding = embeddings[chunkIndex];
+        if (embedding === undefined) {
+          throw new Error(`Missing embedding for chunk ${chunkIndex} of ${article.url}`);
+        }
         chunks.push(
           createKnowledgeChunk({
             document,
@@ -271,10 +280,8 @@ export class IngestFeedsCommand {
           }),
         );
       }
-      if (documents.length > 0) {
-        storedArticles.set(article.url, timestamp);
-        if (timestamp !== null) latest = Math.max(latest ?? timestamp, timestamp);
-      }
+      storedArticles.set(article.url, timestamp);
+      if (timestamp !== null) latest = Math.max(latest ?? timestamp, timestamp);
     }
 
     return {

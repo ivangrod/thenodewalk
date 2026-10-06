@@ -26,8 +26,9 @@ The web app runs at `http://localhost:3000`, the API at `http://localhost:3001`,
 ## Local Infrastructure
 
 Docker Compose starts PostgreSQL 17 (relational data), ChromaDB (the RAG vector store),
-pgAdmin, and ChromaDB UI. Database data persists in the `postgres-data` Docker volume;
-pgAdmin configuration persists in `pgadmin-data`. ChromaDB stores its collections and
+pgAdmin, and ChromaDB UI. PostgreSQL stores its database in `./data_containers/postgres`,
+bind-mounted to `/var/lib/postgresql/data`. pgAdmin configuration persists in the
+`pgadmin-data` Docker volume. ChromaDB stores its collections and
 embeddings in `./data_containers/chromadb`, bind-mounted to `/data` inside the container.
 The `data_containers` directory is excluded from Git and created automatically by Compose.
 
@@ -54,10 +55,23 @@ pnpm infra:logs
 pnpm infra:down
 ```
 
-`infra:down` preserves all stored data. `docker compose down --volumes` removes the PostgreSQL
-and pgAdmin Docker volumes, but preserves ChromaDB collections in `data_containers/chromadb`.
-Those collections are available again after `pnpm infra:up`; deleting the host directory or
-deleting a collection through the ChromaDB API still removes its data.
+`infra:down` preserves all stored data. `docker compose down --volumes` removes the pgAdmin
+Docker volume, but preserves PostgreSQL data and ChromaDB collections in `data_containers`.
+Those databases are available again after `pnpm infra:up`; deleting their host directories or
+deleting data through the database APIs still removes that data.
+
+If PostgreSQL already has data in the previous `thenodewalk_postgres-data` volume, migrate it
+before recreating its container with the new mount. With the existing container still present
+and the destination directory empty, stop PostgreSQL before copying its files:
+
+```sh
+mkdir -p data_containers/postgres
+docker compose stop postgres
+docker cp -a thenodewalk-postgres-1:/var/lib/postgresql/data/. ./data_containers/postgres/
+docker compose up --detach postgres
+```
+
+Keep the old Docker volume until you have verified the migrated database.
 
 If you already have data in the previous `thenodewalk_chroma-data` volume, migrate it before
 recreating ChromaDB with the new mount. With the existing container still present and the
@@ -127,6 +141,11 @@ Distinct feeds sharing a blog name bypass the cursor and report `ambiguous-origi
 Renaming a blog triggers a full ingestion for that new name. The comparison is strictly
 newer: backdated posts and posts later added with the exact cursor timestamp require `--full`.
 The first run after upgrading reingests existing vectors idempotently to populate dates.
+
+Chunks and questions are embedded with Ollama's `/api/embed` and the task prefixes of the
+embedding model, and compared with the cosine distance. A `knowledge_chunks` collection built
+with the previous `l2` scheme is rejected with `IncompatibleKnowledgeCollectionError`: delete it
+and run `ingest --full` (see `docs/rag/operations-and-verification.md`).
 
 ### Ask a question
 
