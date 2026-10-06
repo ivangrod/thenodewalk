@@ -1,0 +1,19 @@
+apps/api/src/shared/infrastructure/event-bus/in-memory-event-bus.spec.ts
+  s_6bca6af610b94f::t_c09d20cdb8f9e4 1-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "11a702873647f7ec3e276aaf68453bc10c14c235",
+  "prompts": {},
+  "sessions": {
+    "s_6bca6af610b94f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eef6fe070ffeCYfnrvJg7TFEGy",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
