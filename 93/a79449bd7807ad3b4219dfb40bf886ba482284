@@ -1,0 +1,33 @@
+apps/api/src/knowledge/application/ingest-feeds.command.spec.ts
+  s_6bca6af610b94f::t_b2eb0d47ba1d0f 4,14-15,31,40-41,47-52,56,61,64,68-202,380
+apps/api/src/knowledge/application/ingest-feeds.command.ts
+  s_6bca6af610b94f::t_79193dc65f05a4 9-12,26,36,42,64-66,96-97,100,105-113,115,118-119,129-138,141-159,161-162,167,197-198,216-217,222-234,237-239,241,247-250,257-258,268,274-277,280-286
+apps/api/src/knowledge/application/save-last-publication-date.command.spec.ts
+  s_6bca6af610b94f::t_943ec317a2e6d5 1-45
+apps/api/src/knowledge/application/testing/knowledge-test-doubles.ts
+  s_6bca6af610b94f::t_c9d4576c9918b9 22-50,57,85,93,118,121,161
+apps/api/src/knowledge/infrastructure/cli/ingest.ts
+  s_6bca6af610b94f::t_586820f38f5a30 16,18,23-28,36-38,40
+apps/api/src/knowledge/infrastructure/feed/rss-article-feed.reader.spec.ts
+  s_6bca6af610b94f::t_9f9e3e736fb843 1-27
+apps/api/src/knowledge/infrastructure/ingestion.integration.spec.ts
+  s_6bca6af610b94f::t_5d3cbeca6ac43c 1-70
+apps/api/src/knowledge/infrastructure/knowledge.module.ts
+  s_6bca6af610b94f::t_94675f1bf94f06 1-7,16,62-67,115-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "93a79449bd7807ad3b4219dfb40bf886ba482284",
+  "prompts": {},
+  "sessions": {
+    "s_6bca6af610b94f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eef6fe070ffeCYfnrvJg7TFEGy",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
