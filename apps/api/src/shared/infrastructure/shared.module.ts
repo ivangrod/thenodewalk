@@ -1,14 +1,19 @@
 import { Module } from '@nestjs/common';
 
-import { EVENT_BUS } from '../application/event-bus.token';
+import { EVENT_BUS, EVENT_SUBSCRIBER_REGISTRY } from '../application/event-bus.token';
 import { InMemoryEventBus } from './event-bus/in-memory-event-bus';
+import { PrismaService } from './persistence/prisma/prisma.service';
 
 /**
- * Provides cross-context infrastructure. For now it only exposes the
- * application {@link EventBus} implementation bound to its injection token.
+ * Provides the shared event bus, subscriber registry and lazy Prisma client.
  */
 @Module({
-  providers: [{ provide: EVENT_BUS, useClass: InMemoryEventBus }],
-  exports: [EVENT_BUS],
+  providers: [
+    InMemoryEventBus,
+    PrismaService,
+    { provide: EVENT_BUS, useExisting: InMemoryEventBus },
+    { provide: EVENT_SUBSCRIBER_REGISTRY, useExisting: InMemoryEventBus },
+  ],
+  exports: [EVENT_BUS, EVENT_SUBSCRIBER_REGISTRY, PrismaService],
 })
 export class SharedModule {}
