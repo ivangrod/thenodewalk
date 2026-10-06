@@ -1,0 +1,16 @@
+README.md
+  h_a3b97539b00b18 116-117
+apps/api/src/knowledge/infrastructure/cli/ingest.ts
+  h_a3b97539b00b18 4-5,25-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "14bbdcf10840b7cc332054be4869810cc4eb2b3e",
+  "prompts": {},
+  "humans": {
+    "h_a3b97539b00b18": {
+      "author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
