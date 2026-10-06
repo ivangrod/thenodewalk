@@ -1,0 +1,23 @@
+apps/api/src/knowledge/application/save-last-publication-date.command.ts
+  s_6bca6af610b94f::t_81fc4610523ffb 1-28
+apps/api/src/knowledge/domain/select-new-feed-articles.spec.ts
+  s_6bca6af610b94f::t_24bfa303e0bd28 1-30
+apps/api/src/knowledge/domain/select-new-feed-articles.ts
+  s_6bca6af610b94f::t_85f9e185ef8312 1-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0fa4c59587554da03046d797981680fb80e54580",
+  "prompts": {},
+  "sessions": {
+    "s_6bca6af610b94f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eef6fe070ffeCYfnrvJg7TFEGy",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
