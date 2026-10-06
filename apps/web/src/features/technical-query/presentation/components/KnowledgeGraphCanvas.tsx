@@ -1,6 +1,7 @@
 'use client';
 
 import { Graph, type GraphType } from 'd3-graph-react';
+import { forceCollide, forceLink, forceManyBody, forceX, forceY } from 'd3-force';
 import { select } from 'd3-selection';
 import { zoom, zoomIdentity, zoomTransform } from 'd3-zoom';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
@@ -90,17 +91,38 @@ export default function KnowledgeGraphCanvas({ graph }: { graph: KnowledgeGraph 
         for (const node of nodes) {
           const index = ring.indexOf(node);
           const angle = (2 * Math.PI * index) / Math.max(1, ring.length);
-          node.x = node.fx = index === -1 ? 0 : Math.cos(angle) * radius;
-          node.y = node.fy = index === -1 ? 0 : Math.sin(angle) * radius;
+          node.x = index === -1 ? 0 : Math.cos(angle) * radius;
+          node.y = index === -1 ? 0 : Math.sin(angle) * radius;
+          if (index === -1) {
+            node.fx = 0;
+            node.fy = 0;
+          }
         }
+        simulation
+          .force('charge', forceManyBody().strength(-450))
+          .force('collision', forceCollide(125))
+          .force(
+            'link',
+            forceLink<(typeof nodes)[number], { source: number; target: number }>(
+              data.links.map((link) => ({ ...link })),
+            )
+              .id((node) => node.index)
+              .distance(260)
+              .strength(0.45),
+          )
+          .force('x', forceX(0).strength(0.04))
+          .force('y', forceY(0).strength(0.04));
         simulation.stop();
+        // Resolve the initial layout without animated motion. Dragging reheats the
+        // simulation, which settles again rather than moving perpetually.
+        simulation.tick(180);
       },
-      [graph.centralNodeId],
+      [graph.centralNodeId, data.links],
     );
   useEffect(() => {
     const svg = container.current?.querySelector('svg');
     if (!svg) return;
-    const radius = Math.max(180, data.nodes.length * 38) + 110;
+    const radius = Math.max(270, data.nodes.length * 48) + 110;
     svg.setAttribute('viewBox', `${-radius} ${-radius} ${radius * 2} ${radius * 2}`);
   }, [data]);
   const openSource = useCallback(
@@ -130,8 +152,17 @@ export default function KnowledgeGraphCanvas({ graph }: { graph: KnowledgeGraph 
     active?.graph === graph ? (graph.nodes.find((node) => node.id === active.id) ?? null) : null;
   return (
     <SourceActivationContext.Provider value={openSource}>
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2" aria-label="Graph controls">
+      <div className="knowledge-graph-theme overflow-hidden rounded-2xl border border-slate-700/70 bg-[#0d1019] text-slate-100">
+        <div
+          className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-[#11141d] px-4 py-3"
+          aria-label="Graph controls"
+        >
+          <span className="mr-auto text-sm font-semibold">
+            Knowledge graph{' '}
+            <span className="ml-2 text-xs font-normal text-slate-400">
+              {data.nodes.length} concepts
+            </span>
+          </span>
           <Button variant="outline" onClick={() => navigate('in')}>
             Zoom in
           </Button>
@@ -146,7 +177,7 @@ export default function KnowledgeGraphCanvas({ graph }: { graph: KnowledgeGraph 
           ref={container}
           role="figure"
           aria-label="Interactive knowledge graph"
-          className="h-[28rem] overflow-hidden rounded-2xl border bg-muted/30"
+          className="h-[36rem] overflow-hidden bg-[radial-gradient(circle,#334155_1px,transparent_1px)] bg-size-[20px_20px] lg:h-[calc(100vh-8rem)]"
         >
           <Graph<ConceptGraphNode, ConceptLink>
             key={JSON.stringify(data)}
@@ -154,24 +185,13 @@ export default function KnowledgeGraphCanvas({ graph }: { graph: KnowledgeGraph 
             NodeComponent={ConceptNode}
             LinkComponent={RelationshipLink}
             onSimulationCreated={initialize}
-            isNodeDraggable={false}
+            isNodeDraggable={true}
             ambientAlphaTarget={0}
             zoomScale={[0.5, 4]}
             containerClassName="knowledge-graph h-full w-full"
             svgClassName="h-full w-full"
           />
         </div>
-        <details className="rounded-xl border bg-card p-3 text-sm">
-          <summary className="cursor-pointer font-medium">Graph relationships (text view)</summary>
-          <ul className="mt-3 space-y-2">
-            {graph.edges.map((edge, index) => (
-              <li key={index}>
-                {graph.nodes.find((node) => node.id === edge.source)?.label} → {edge.relationship} →{' '}
-                {graph.nodes.find((node) => node.id === edge.target)?.label}
-              </li>
-            ))}
-          </ul>
-        </details>
       </div>
       <ArticleSourceDialog
         node={selected}

@@ -9,7 +9,7 @@ function GraphSkeleton(): ReactElement {
   return (
     <div
       aria-hidden="true"
-      className="h-[28rem] w-full animate-pulse rounded-2xl border bg-muted"
+      className="h-[36rem] w-full animate-pulse rounded-2xl border bg-muted lg:h-[calc(100vh-8rem)]"
     />
   );
 }
