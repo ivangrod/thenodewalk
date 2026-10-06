@@ -2,6 +2,17 @@ import { faker } from '@faker-js/faker';
 
 import type { FeedArticle } from '../article-feed-reader';
 import type { FeedSubscription } from '../feed-subscription-reader';
+import type { FeedLastPublicationDate } from '../feed-last-publication-date';
+
+export class FeedLastPublicationDateMother {
+  static create(params?: Partial<FeedLastPublicationDate>): FeedLastPublicationDate {
+    return {
+      blogName: faker.company.name(),
+      lastPublishedAt: faker.date.recent().toISOString(),
+      ...params,
+    };
+  }
+}
 import {
   createKnowledgeChunk,
   type KnowledgeChunk,

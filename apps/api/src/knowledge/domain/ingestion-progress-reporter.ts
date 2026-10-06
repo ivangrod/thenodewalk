@@ -16,7 +16,7 @@ export interface IngestionProgressReporter {
   feedStarted(progress: FeedIngestionProgress): void;
   feedCompleted(
     progress: FeedIngestionProgress,
-    totals: { articles: number; chunks: number },
+    totals: { articles: number; chunks: number; skippedArticles?: number },
   ): void;
   feedFailed(progress: FeedIngestionProgress, reason: string): void;
 }
