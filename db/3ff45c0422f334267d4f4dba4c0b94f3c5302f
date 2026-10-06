@@ -1,0 +1,61 @@
+.agents/skills/codely-doc-create/SKILL.md
+  s_6bca6af610b94f::t_6d9de8eb96b407 8
+.agents/skills/codely-doc-create/resources/documentation-guidelines.md
+  s_6bca6af610b94f::t_cecd9d94e344ab 60,64,68
+.agents/skills/codely-git-conventional_commit/SKILL.md
+  s_6bca6af610b94f::t_8ba5614cc6b232 8
+.agents/skills/codely-plan-create-github/SKILL.md
+  s_6bca6af610b94f::t_a3f33e7b5a3b7d 8,75,95,100
+.agents/skills/codely-plan-create-subagents/SKILL.md
+  s_6bca6af610b94f::t_107ace0b169ab4 8,29-34,57-59,62,64-66
+.agents/skills/codely-plan_phase-implement-github/SKILL.md
+  s_6bca6af610b94f::t_0a71c62920d7fe 8,17
+.agents/skills/codely-plan_phase-implement/SKILL.md
+  s_6bca6af610b94f::t_8237d088216e46 8,17,41,43-45,47-48
+docs/backend/cqrs-and-domain-events.md
+  s_6bca6af610b94f::t_50c85f4400d1d7 4-5,11,19,24,30,38,51,56,70
+docs/backend/dependency-injection.md
+  s_6bca6af610b94f::t_4c9c58a5c82ff2 4-6,14,22,34,63,76,82
+docs/backend/hexagonal-architecture.md
+  s_6bca6af610b94f::t_db0ae4ce41ef90 4,6,13-15,18,26,29,38,41,49
+docs/backend/thin-controllers.md
+  s_6bca6af610b94f::t_30eb2888bcf8fb 4,8,15,21,32
+docs/code-style.md
+  s_6bca6af610b94f::t_fc5c39c40b2547 4,6,14,23,32,41,46
+docs/database/prisma-conventions.md
+  s_6bca6af610b94f::t_70f94811769bb3 4,6,13,21,27,36
+docs/documentation-format.md
+  s_6bca6af610b94f::t_0386764d9426cc 4-6,10,18,23,27,31,33,37,41,45,50
+docs/frontend/accessibility.md
+  s_6bca6af610b94f::t_082350716c68d1 4,8,16,32,45,50
+docs/frontend/frontend-architecture.md
+  s_6bca6af610b94f::t_ffa00fb0f90d4c 4,6,10,18,32,43,48-56,65,70
+docs/frontend/performance.md
+  s_6bca6af610b94f::t_9cd017aeeda719 4,8,16,22-25,33,44,49
+docs/frontend/state-management.md
+  s_6bca6af610b94f::t_897db2211859c8 4,8,16,34,40,53,58
+docs/monorepo/shared-contracts.md
+  s_6bca6af610b94f::t_3512b0f9f217fd 4-5,9,17,35,38-41,43,45-48,52,57
+docs/monorepo/turborepo-configuration.md
+  s_6bca6af610b94f::t_4eb51f3353dae7 4-6,12,20,42,56,61
+docs/testing/mock-objects.md
+  s_6bca6af610b94f::t_8c5b17cf642439 4,8,15
+docs/testing/object-mothers.md
+  s_6bca6af610b94f::t_67142df0cf7841 4,8,15,17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "db3ff45c0422f334267d4f4dba4c0b94f3c5302f",
+  "prompts": {},
+  "sessions": {
+    "s_6bca6af610b94f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_eef6fe070ffeCYfnrvJg7TFEGy",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "ivangrod <ivangutrod@gmail.com>"
+    }
+  }
+}
