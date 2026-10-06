@@ -26,8 +26,10 @@ The web app runs at `http://localhost:3000`, the API at `http://localhost:3001`,
 ## Local Infrastructure
 
 Docker Compose starts PostgreSQL 17 (relational data), ChromaDB (the RAG vector store),
-pgAdmin, and ChromaDB UI. Database and vector data persist in the `postgres-data` and
-`chroma-data` volumes; pgAdmin configuration persists in `pgadmin-data`.
+pgAdmin, and ChromaDB UI. Database data persists in the `postgres-data` Docker volume;
+pgAdmin configuration persists in `pgadmin-data`. ChromaDB stores its collections and
+embeddings in `./data_containers/chromadb`, bind-mounted to `/data` inside the container.
+The `data_containers` directory is excluded from Git and created automatically by Compose.
 
 ```sh
 pnpm infra:up
@@ -52,7 +54,21 @@ pnpm infra:logs
 pnpm infra:down
 ```
 
-`infra:down` preserves the data volume. Run `docker compose down --volumes` only when you want to remove the local database.
+`infra:down` preserves all stored data. `docker compose down --volumes` removes the PostgreSQL
+and pgAdmin Docker volumes, but preserves ChromaDB collections in `data_containers/chromadb`.
+Those collections are available again after `pnpm infra:up`; deleting the host directory or
+deleting a collection through the ChromaDB API still removes its data.
+
+If you already have data in the previous `thenodewalk_chroma-data` volume, migrate it before
+recreating ChromaDB with the new mount. With the existing container still present and the
+destination directory empty:
+
+```sh
+mkdir -p data_containers/chromadb
+docker compose stop chromadb
+docker cp thenodewalk-chromadb-1:/data/. ./data_containers/chromadb/
+docker compose up --detach chromadb
+```
 
 ## TechGraph RAG (The Node Walk)
 

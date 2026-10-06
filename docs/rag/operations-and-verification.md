@@ -29,9 +29,10 @@ list, and verify the API and web application through the standard test suites.
    update.
 9. Diagnose local incidents from their real source before touching code. A `connection refused`
    against the API usually means `pnpm dev` is not running. An empty `/ask` answer after touching
-   local infrastructure usually means the `chroma-data` Docker volume was recreated (a Rancher
-   Desktop reset, `docker compose down --volumes`, or a volume prune) and `knowledge_chunks` needs
-   to be ingested again, not that ingestion is broken.
+   local infrastructure can mean `knowledge_chunks` has no ingested data. ChromaDB persists in
+   `data_containers/chromadb`, bind-mounted to `/data` and excluded from Git. Recreating containers
+   or deleting Docker volumes preserves these files; deleting the host directory or the
+   collection itself requires ingestion again.
 10. Run the mandatory format, lint, architecture, typecheck, unit, and E2E suites before
     considering a change complete.
 
@@ -161,9 +162,10 @@ lsof -nP -iTCP:3001 -sTCP:LISTEN   # empty output means the API is not running
 ### ✅ Good: Confirming the vector store before re-running ingestion
 
 ```sh
-docker volume inspect thenodewalk_chroma-data --format '{{.CreatedAt}}'
-# A timestamp from a few minutes ago means the volume was recreated and
-# knowledge_chunks is empty again, not that /ask or ingestion regressed.
+docker inspect thenodewalk-chromadb-1 --format '{{json .Mounts}}'
+# Confirm /data is a bind mount sourced from this project's data_containers/chromadb.
+curl --fail http://localhost:8000/api/v2/tenants/default_tenant/databases/default_database/collections
+# If knowledge_chunks is missing or empty, ingest feeds again.
 pnpm --filter @thenodewalk/api ingest
 ```
 
