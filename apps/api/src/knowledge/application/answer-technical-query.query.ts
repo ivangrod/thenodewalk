@@ -8,6 +8,7 @@ import type {
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import { selectBalancedMatches } from '../domain/balanced-matches';
+import { attachMissingSources } from '../domain/attach-missing-sources';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
 import type {
   GeneratedGraph,
@@ -98,7 +99,10 @@ export class AnswerTechnicalQueryQuery {
       return this.toResponse(
         {
           summary: generated.summary,
-          graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+          graph: attachMissingSources(
+            limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+            matches.map(({ chunk }) => chunk.metadata),
+          ),
         },
         sources,
       );

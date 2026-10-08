@@ -30,6 +30,16 @@ keeps responsibilities separated:
    visible `Main idea` text (never by colour alone) and its accessible name includes it:
    `"{label}, main idea, open source in a new tab"` or `"{label}, main idea, no linked source"`.
    Without a known central node, every concept is placed on the circle.
+9. After successful generation, every selected retrieved source appears exactly once.
+   The API grounds/deduplicates sources, resolves the centre, limits depth, then attaches
+   missing sources directly to the centre with a neutral `retrieved source` edge.
+   Added nodes show the post title or `{bookTitle} - {sectionTitle}`. These labels identify
+   provenance, not additional model-generated claims. Existing concepts remain unchanged.
+   With five available selected sources (three book sections, two posts), a seven-node graph
+   therefore has five sourced nodes and two unsourced concepts. Seven is an example, not a
+   fixed node count: added source nodes can increase the generated graph's size.
+   Empty generated graphs become source-only graphs, using the first selected source as the
+   centre. Generation failures retain the explanatory empty response.
 
 The graph canvas is an enhancement for the structured response. The summary and query-state
 messages remain readable regardless of whether the graph has nodes.

@@ -15,7 +15,7 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T10:19:12Z'
+last_implementation_at: '2026-10-08T10:24:02Z'
 has_completed_all_phases: false
 ---
 
@@ -379,13 +379,13 @@ are documented. Source coverage in the generated graph remains Phase 6.
 Every retrieved source appears exactly once in the graph, so a 7-node graph shows 3 book nodes, 2 post nodes and the
 remaining nodes without a source.
 
-- [ ] Domain `attachMissingSources(graph, sources: RetrievedSource[]): KnowledgeGraph`:
+- [x] Domain `attachMissingSources(graph, sources: RetrievedSource[]): KnowledgeGraph`:
   - Adds one node per retrieved source not linked by any generated node. Book labels are
     `{bookTitle} - {sectionTitle}` and post labels are the article title.
   - Connects every added node to the central node, so the graph stays within `MAX_GRAPH_DEPTH`.
-- [ ] Pipeline order in `AnswerTechnicalQueryQuery`: assign unique sources, resolve the central node, limit depth, then
+- [x] Pipeline order in `AnswerTechnicalQueryQuery`: assign unique sources, resolve the central node, limit depth, then
       attach missing sources.
-- [ ] Test suites:
+- [x] Test suites:
   - `attach-missing-sources.spec.ts` (new):
     - adds a node per unlinked source.
     - connects added nodes to the central node.
@@ -393,11 +393,19 @@ remaining nodes without a source.
     - does nothing when every source is linked.
     - keeps the graph within `MAX_GRAPH_DEPTH`.
   - `answer-technical-query.query.spec.ts`: links every retrieved source exactly once.
-- [ ] Update `docs/frontend/technical-query-knowledge-graph.md` with the coverage rule.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Update `docs/frontend/technical-query-knowledge-graph.md` with the coverage rule.
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Verification: all five required checks passed (171 API tests, 13 web tests). Domain tests
+cover missing-source labels/edges, input deduplication, idempotence, non-mutation, generated
+ID collisions and empty graphs. The query test verifies seven nodes with exactly three book
+sources, two posts and two unsourced concepts, including restoration after depth pruning.
+Added edges use the neutral `retrieved source` relationship. Empty generated graphs become
+source-only graphs with the first selected source as centre; generation errors retain their
+safe empty response. Seven nodes is an example, not a fixed total node limit.
 
 ### Phase 7: Incremental book ingestion
 
@@ -424,6 +432,6 @@ remaining nodes without a source.
 
 ## ⏭️ Next step
 
-Review Phase 5, then implement Phase 6 (guaranteed source coverage in the graph) when explicitly requested.
+Review Phase 6, then implement Phase 7 (incremental book ingestion) when explicitly requested.
 
-With badges 🏷️, books 📚 and clean chapters 🧹 balanced ⚖️ for the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward complete source coverage.
+With badges 🏷️, books 📚 and clean chapters 🧹 balanced ⚖️ and linked 🔗 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward incremental ingestion.

@@ -36,6 +36,58 @@ function buildQuery(matches: KnowledgeSearchMatch[]): {
 }
 
 describe('AnswerTechnicalQueryQuery', () => {
+  it('covers all five balanced sources exactly once, restoring links lost to depth pruning', async () => {
+    const books = Array.from({ length: 3 }, (_, index) => ({
+      chunk: BookChunkMother.create({ bookId: `book-${index}`, sectionTitle: `Section ${index}` }),
+      score: 0.9 - index * 0.1,
+    }));
+    const posts = [matchWith('https://post.test/first'), matchWith('https://post.test/second')];
+    const { query, generator } = buildQuery([...books, ...posts]);
+    generator.result = {
+      summary: 'Balanced answer',
+      graph: {
+        nodes: [
+          KnowledgeGraphNodeMother.create({
+            id: 'central',
+            sourceId: posts[0]!.chunk.metadata.sourceId,
+          }),
+          KnowledgeGraphNodeMother.create({ id: 'concept', sourceId: null }),
+          KnowledgeGraphNodeMother.create({
+            id: 'duplicate',
+            sourceId: posts[0]!.chunk.metadata.sourceId,
+          }),
+          KnowledgeGraphNodeMother.create({
+            id: 'disconnected',
+            sourceId: books[0]!.chunk.metadata.sourceId,
+          }),
+        ],
+        edges: [
+          { source: 'central', target: 'concept', relationship: 'explains' },
+          { source: 'central', target: 'duplicate', relationship: 'relates to' },
+        ],
+        centralNodeId: 'central',
+      },
+    };
+    const response = await query.execute('Question');
+    expect(response.graph.nodes).toHaveLength(7);
+    expect(response.graph.nodes.filter(({ source }) => source?.kind === 'book')).toHaveLength(3);
+    expect(response.graph.nodes.filter(({ source }) => source?.kind === 'post')).toHaveLength(2);
+    expect(response.graph.nodes.filter(({ source }) => source === null)).toHaveLength(2);
+    expect(response.graph.nodes.some(({ id }) => id === 'disconnected')).toBe(false);
+    expect(response.graph.nodes.find(({ id }) => id === 'duplicate')?.source).toBeNull();
+    expect(response.graph.edges).toHaveLength(6);
+    expect(response.graph.edges.every(({ source }) => source === 'central')).toBe(true);
+    expect(response.summary).toBe('Balanced answer');
+  });
+
+  it('builds source nodes from an empty generated graph, while generation failures still return the safe empty response', async () => {
+    const chunk = BookChunkMother.create();
+    const { query } = buildQuery([{ chunk, score: 0.9 }]);
+    const response = await query.execute('Question');
+    expect(response.graph.nodes).toHaveLength(1);
+    expect(response.graph.centralNodeId).toBe(response.graph.nodes[0]?.id);
+    expect(response.graph.nodes[0]?.source?.kind).toBe('book');
+  });
   it('starts both searches before either completes, then generates from balanced sources', async () => {
     const books = Array.from({ length: 5 }, (_, index) => ({
       chunk: BookChunkMother.create({ bookId: `book-${index}` }),
@@ -220,6 +272,7 @@ describe('AnswerTechnicalQueryQuery', () => {
       KnowledgeGraphNodeMother.create({ sourceId: null }),
     );
     const central = chain[0] as KnowledgeGraphNode;
+    central.sourceId = 'https://blog.test/main';
     const disconnected = KnowledgeGraphNodeMother.create({ sourceId: null });
     generator.result = {
       summary: 'A deep graph.',

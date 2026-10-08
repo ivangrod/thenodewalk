@@ -172,7 +172,13 @@ relevant selected source globally rather than necessarily a book.
 
 Existing post metadata must be backfilled with `chroma:migrate` before using these filters:
 legacy records without `sourceType` do not match either filtered search. Retrieval enforces
-the context quota; deterministic graph source coverage is implemented in the next phase.
+the context quota. After successful generation, `attachMissingSources` runs after grounding,
+central-node resolution and depth pruning, so even sources pruned from the graph are restored.
+It adds title-labelled source nodes linked directly to the centre with `retrieved source`
+edges. Missing sources appear exactly once with deterministic collision-free node ids.
+If generation returns no nodes, the first selected source becomes the centre of a source-only
+graph. No sources are fabricated when retrieval is empty or generation fails. The total node
+count is not fixed; provenance nodes can increase it while remaining one hop from the centre.
 
 ### PDF extraction and cleanup
 
