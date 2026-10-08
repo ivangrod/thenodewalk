@@ -44,7 +44,7 @@ describe('AnswerTechnicalQueryQuery', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/post',
+            sourceId: 'https://netflixtechblog.com/post',
           },
         ],
         edges: [{ source: 'gateway', target: 'gateway', relationship: 'self' }],
@@ -60,11 +60,14 @@ describe('AnswerTechnicalQueryQuery', () => {
     expect(repository.searchCalls[0]?.limit).toBe(TECHNICAL_QUERY_TOP_K);
     expect(generator.calls).toHaveLength(1);
     expect(response.summary).toBe('Netflix uses a federated API gateway.');
-    expect(response.graph.nodes[0]?.sourceUrl).toBe('https://netflixtechblog.com/post');
+    expect(response.graph.nodes[0]?.source).toEqual({
+      kind: 'post',
+      url: 'https://netflixtechblog.com/post',
+    });
     expect(response.graph.edges).toHaveLength(1);
   });
 
-  it('returns nodes without a source with a null sourceUrl', async () => {
+  it('returns nodes without a source with a null source', async () => {
     const { query, generator } = buildQuery([matchWith('https://blog.test/post')]);
     generator.result = {
       summary: 'Event sourcing stores changes as events.',
@@ -74,9 +77,9 @@ describe('AnswerTechnicalQueryQuery', () => {
             id: 'event-sourcing',
             label: 'Event Sourcing',
             type: 'concept',
-            sourceUrl: 'https://blog.test/post',
+            sourceId: 'https://blog.test/post',
           },
-          { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+          { id: 'event', label: 'Domain Event', type: 'concept', sourceId: null },
         ],
         edges: [{ source: 'event-sourcing', target: 'event', relationship: 'stores' }],
         centralNodeId: 'event-sourcing',
@@ -90,9 +93,9 @@ describe('AnswerTechnicalQueryQuery', () => {
         id: 'event-sourcing',
         label: 'Event Sourcing',
         type: 'concept',
-        sourceUrl: 'https://blog.test/post',
+        source: { kind: 'post', url: 'https://blog.test/post' },
       },
-      { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+      { id: 'event', label: 'Domain Event', type: 'concept', source: null },
     ]);
     expect(response.graph.edges).toHaveLength(1);
   });
@@ -104,9 +107,9 @@ describe('AnswerTechnicalQueryQuery', () => {
       summary: 'Kafka stores records in partitioned topics.',
       graph: {
         nodes: [
-          KnowledgeGraphNodeMother.create({ id: 'kafka', sourceUrl: sharedUrl }),
-          KnowledgeGraphNodeMother.create({ id: 'topic', sourceUrl: sharedUrl }),
-          KnowledgeGraphNodeMother.create({ id: 'partition', sourceUrl: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'kafka', sourceId: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'topic', sourceId: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'partition', sourceId: sharedUrl }),
         ],
         edges: [
           { source: 'kafka', target: 'topic', relationship: 'organizes' },
@@ -118,8 +121,8 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('How does Kafka store data?');
 
-    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
-      ['kafka', sharedUrl],
+    expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
+      ['kafka', { kind: 'post', url: sharedUrl }],
       ['topic', null],
       ['partition', null],
     ]);
@@ -133,10 +136,10 @@ describe('AnswerTechnicalQueryQuery', () => {
       summary: 'A summary.',
       graph: {
         nodes: [
-          KnowledgeGraphNodeMother.create({ id: 'grounded', sourceUrl: retrievedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'grounded', sourceId: retrievedUrl }),
           KnowledgeGraphNodeMother.create({
             id: 'invented',
-            sourceUrl: 'https://blog.test/hallucinated',
+            sourceId: 'https://blog.test/hallucinated',
           }),
         ],
         edges: [KnowledgeGraphEdgeMother.create({ source: 'grounded', target: 'invented' })],
@@ -146,8 +149,8 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('a question');
 
-    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
-      ['grounded', retrievedUrl],
+    expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
+      ['grounded', { kind: 'post', url: retrievedUrl }],
       ['invented', null],
     ]);
   });
@@ -155,10 +158,10 @@ describe('AnswerTechnicalQueryQuery', () => {
   it('returns the graph limited to 3 levels from the central node', async () => {
     const { query, generator } = buildQuery([matchWith('https://blog.test/main')]);
     const chain = Array.from({ length: MAX_GRAPH_DEPTH + 3 }, () =>
-      KnowledgeGraphNodeMother.create({ sourceUrl: null }),
+      KnowledgeGraphNodeMother.create({ sourceId: null }),
     );
     const central = chain[0] as KnowledgeGraphNode;
-    const disconnected = KnowledgeGraphNodeMother.create({ sourceUrl: null });
+    const disconnected = KnowledgeGraphNodeMother.create({ sourceId: null });
     generator.result = {
       summary: 'A deep graph.',
       graph: {
@@ -185,8 +188,8 @@ describe('AnswerTechnicalQueryQuery', () => {
     const mainPostUrl = 'https://blog.test/main';
     const secondaryUrl = 'https://blog.test/secondary';
     const { query, generator } = buildQuery([matchWith(mainPostUrl), matchWith(secondaryUrl)]);
-    const secondary = KnowledgeGraphNodeMother.create({ sourceUrl: secondaryUrl });
-    const mainIdea = KnowledgeGraphNodeMother.create({ sourceUrl: mainPostUrl });
+    const secondary = KnowledgeGraphNodeMother.create({ sourceId: secondaryUrl });
+    const mainIdea = KnowledgeGraphNodeMother.create({ sourceId: mainPostUrl });
     generator.result = {
       summary: 'A summary.',
       graph: {

@@ -7,6 +7,7 @@
     "dev": "nest start --watch",
     "start": "node dist/main",
     "ingest": "ts-node src/knowledge/infrastructure/cli/ingest.ts",
+    "chroma:migrate": "ts-node src/knowledge/infrastructure/cli/chroma-migrate.ts",
     "lint": "eslint .",
     "lint:architecture": "eslint --config eslint.architecture.config.mjs src",
     "typecheck": "tsc --noEmit",

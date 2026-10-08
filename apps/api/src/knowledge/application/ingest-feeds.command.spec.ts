@@ -65,6 +65,24 @@ function buildCommand(scenario: Scenario): {
 }
 
 describe('IngestFeedsCommand', () => {
+  it('stores post source metadata using the article URL as identity', async () => {
+    const subscription = FeedSubscriptionMother.create();
+    const article = FeedArticleMother.create();
+    const scenario = buildCommand({
+      subscriptions: [subscription],
+      articlesByFeedUrl: new Map([[subscription.feedUrl, [article]]]),
+      defaultText: 'indexed content',
+    });
+
+    await scenario.command.execute(OPML_PATH);
+
+    expect([...scenario.repository.store.values()][0]?.metadata).toMatchObject({
+      sourceType: 'post',
+      sourceId: article.url,
+      articleUrl: article.url,
+    });
+  });
+
   it('loads dates once and skips old posts before extraction or embedding', async () => {
     const subscription = FeedSubscriptionMother.create();
     const old = FeedArticleMother.create({ publishedAt: '2026-01-01T00:00:00Z' });

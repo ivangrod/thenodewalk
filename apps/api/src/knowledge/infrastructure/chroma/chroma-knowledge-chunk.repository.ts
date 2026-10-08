@@ -88,6 +88,8 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
 
   private toMetadata(metadata: KnowledgeChunkMetadata): Metadata {
     return {
+      sourceType: metadata.sourceType,
+      sourceId: metadata.sourceId,
       blogName: metadata.blogName,
       articleTitle: metadata.articleTitle,
       articleUrl: metadata.articleUrl,
@@ -98,6 +100,8 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
 
   private fromMetadata(metadata: Metadata): KnowledgeChunkMetadata {
     return {
+      sourceType: 'post',
+      sourceId: String(metadata.sourceId ?? metadata.articleUrl ?? ''),
       blogName: String(metadata.blogName ?? ''),
       articleTitle: String(metadata.articleTitle ?? ''),
       articleUrl: String(metadata.articleUrl ?? ''),

@@ -13,10 +13,12 @@ keeps responsibilities separated:
 4. The view renders distinct idle, loading, recoverable-error, no-results, and success states.
 5. React Flow is a heavy browser-only dependency. It must remain behind a `next/dynamic`
    boundary with `ssr: false` and a lightweight loading skeleton.
-6. A knowledge-graph node linked to a post is a real anchor to its `sourceUrl`, not a clickable
+6. A knowledge-graph node linked to a post (`source: { kind: 'post', url }`) is a real anchor to
+   `source.url`, not a clickable
    `div`. The anchor has an accessible name that includes the concept label and source action,
    a visible focus style, `target="_blank"`, and `rel="noreferrer noopener"`.
-7. A node without a post (`sourceUrl: null`) is a `<button type="button">` that selects the
+   Post-linked nodes also show a visible `Post` badge; unsourced nodes have no source badge.
+7. A node without a post (`source: null`) is a `<button type="button">` that selects the
    concept on click and focus. It is never rendered as a link, and its accessible name is
    `"{label}, no linked source"`.
 8. The central node (`graph.centralNodeId`) holds the main idea of the graph. The canvas places
@@ -75,7 +77,7 @@ const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
 });
 
 {
-  data.sourceUrl === null ? (
+  data.source === null ? (
     <button
       aria-label={`${data.label}, no linked source`}
       type="button"
@@ -87,13 +89,14 @@ const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
   ) : (
     <a
       aria-label={`${data.label}, open source in a new tab`}
-      href={data.sourceUrl}
+      href={data.source.url}
       target="_blank"
       rel="noreferrer noopener"
       onFocus={() => select(id)}
       className="focus-visible:outline-none"
     >
       {data.label}
+      <span className="mt-1 block text-xs font-semibold">Post</span>
     </a>
   );
 }
@@ -116,7 +119,7 @@ const useGraphStore = create((set) => ({
 ### ❌ Bad: Non-semantic node interaction
 
 ```tsx
-<div onClick={() => window.open(data.sourceUrl)} className="cursor-pointer">
+<div onClick={() => window.open(data.source?.url)} className="cursor-pointer">
   {data.label}
 </div>
 ```
@@ -126,7 +129,7 @@ This provides neither a semantic link nor an accessible name or guaranteed keybo
 ### ❌ Bad: Linking a concept that has no post
 
 ```tsx
-<a href={data.sourceUrl ?? '#'}>{data.label}</a>
+<a href={data.source?.url ?? '#'}>{data.label}</a>
 ```
 
 A concept without a post must not pretend to be a link: use the selectable button instead.
@@ -134,7 +137,7 @@ A concept without a post must not pretend to be a link: use the selectable butto
 ### ✅ Good: Central node identified by text, not only by colour
 
 ```tsx
-<a aria-label={`${data.label}, main idea, open source in a new tab`} href={data.sourceUrl}>
+<a aria-label={`${data.label}, main idea, open source in a new tab`} href={data.source.url}>
   <span className="block text-xs font-semibold uppercase tracking-wide">Main idea</span>
   {data.label}
 </a>
@@ -143,7 +146,7 @@ A concept without a post must not pretend to be a link: use the selectable butto
 ### ❌ Bad: Central node identified by colour alone
 
 ```tsx
-<a className={isCentral ? 'bg-amber-300' : 'bg-card'} href={data.sourceUrl}>
+<a className={isCentral ? 'bg-amber-300' : 'bg-card'} href={data.source.url}>
   {data.label}
 </a>
 ```

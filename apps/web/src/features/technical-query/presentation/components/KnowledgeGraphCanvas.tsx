@@ -36,7 +36,7 @@ function toFlowNodes(graph: KnowledgeGraph): ConceptFlowNode[] {
       id: node.id,
       type: 'concept',
       position: isCentral ? LAYOUT_CENTRE : ringPosition(ringNodes.indexOf(node), ringNodes.length),
-      data: { label: node.label, sourceUrl: node.sourceUrl, isCentral },
+      data: { label: node.label, source: node.source, isCentral },
     };
   });
 }

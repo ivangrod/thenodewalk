@@ -9,8 +9,13 @@ const RESPONSE: TechnicalQueryResponse = {
   summary: 'Netflix relies on a federated API gateway to scale its services.',
   graph: {
     nodes: [
-      { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl: SOURCE_URL },
-      { id: 'services', label: 'Microservices', type: 'concept', sourceUrl: null },
+      {
+        id: 'gateway',
+        label: 'API Gateway',
+        type: 'concept',
+        source: { kind: 'post', url: SOURCE_URL },
+      },
+      { id: 'services', label: 'Microservices', type: 'concept', source: null },
     ],
     edges: [{ source: 'gateway', target: 'services', relationship: 'routes to' }],
     centralNodeId: 'gateway',
@@ -59,6 +64,7 @@ test.describe('technical query flow', () => {
     await expect(nodeLink).toBeVisible();
     await expect(nodeLink).toHaveAttribute('href', SOURCE_URL);
     await expect(nodeLink).toContainText('Main idea');
+    await expect(nodeLink).toContainText('Post');
 
     const popup = await Promise.all([page.waitForEvent('popup'), nodeLink.click()]).then(
       ([openedPopup]) => openedPopup,

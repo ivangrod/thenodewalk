@@ -1,13 +1,13 @@
 /**
  * Domain model of the knowledge graph produced from a technical query. Mirrors
- * the shared contract shape but keeps the domain free of the contracts package.
+ * the shared contract structure but uses source identities within the domain.
  */
 export interface KnowledgeGraphNode {
   id: string;
   label: string;
   type: 'concept';
-  /** URL of the post (ingested article) linked to the concept, or `null` when it has none. */
-  sourceUrl: string | null;
+  /** Identity of the retrieved source linked to the concept, or `null` when it has none. */
+  sourceId: string | null;
 }
 
 export interface KnowledgeGraphEdge {
@@ -36,28 +36,28 @@ export const EMPTY_GRAPH: KnowledgeGraph = { nodes: [], edges: [], centralNodeId
 
 /**
  * Enforces the source invariants of a knowledge graph:
- * - A node can only be linked to a post that was retrieved as context.
- * - A post is linked to at most one node: the first node (in graph order) that
+ * - A node can only be linked to a source that was retrieved as context.
+ * - A source is linked to at most one node: the first node (in graph order) that
  *   references it keeps it.
  *
- * Any other source is cleared (`sourceUrl: null`). Nodes and edges are always
+ * Any other source is cleared (`sourceId: null`). Nodes and edges are always
  * preserved, so the graph structure never changes.
  */
 export function assignUniqueSources(
   graph: KnowledgeGraph,
-  retrievedSourceUrls: ReadonlySet<string>,
+  retrievedSourceIds: ReadonlySet<string>,
 ): KnowledgeGraph {
-  const linkedSourceUrls = new Set<string>();
+  const linkedSourceIds = new Set<string>();
 
   const nodes = graph.nodes.map((node): KnowledgeGraphNode => {
-    const { sourceUrl } = node;
-    if (sourceUrl === null) {
+    const { sourceId } = node;
+    if (sourceId === null) {
       return node;
     }
-    if (!retrievedSourceUrls.has(sourceUrl) || linkedSourceUrls.has(sourceUrl)) {
-      return { ...node, sourceUrl: null };
+    if (!retrievedSourceIds.has(sourceId) || linkedSourceIds.has(sourceId)) {
+      return { ...node, sourceId: null };
     }
-    linkedSourceUrls.add(sourceUrl);
+    linkedSourceIds.add(sourceId);
     return node;
   });
 

@@ -271,6 +271,8 @@ export class IngestFeedsCommand {
             document,
             embedding,
             metadata: {
+              sourceType: 'post',
+              sourceId: article.url,
               blogName: subscription.blogName,
               articleTitle: article.title,
               articleUrl: article.url,

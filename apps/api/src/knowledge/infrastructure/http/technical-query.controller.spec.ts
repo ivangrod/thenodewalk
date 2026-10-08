@@ -31,7 +31,7 @@ describe('TechnicalQueryController', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/post',
+            source: { kind: 'post', url: 'https://netflixtechblog.com/post' },
           },
         ],
         edges: [],

@@ -67,6 +67,8 @@ describe('ChromaKnowledgeChunkRepository', () => {
       documents: ['chunk text'],
       metadatas: [
         {
+          sourceType: 'post',
+          sourceId: 'https://netflixtechblog.com/scaling-the-edge',
           blogName: 'Netflix Tech Blog',
           articleTitle: 'Scaling the edge',
           articleUrl: 'https://netflixtechblog.com/scaling-the-edge',
@@ -106,7 +108,7 @@ describe('ChromaKnowledgeChunkRepository', () => {
     expect(CHROMA_UPSERT_BATCH_SIZE).toBeLessThanOrEqual(5461);
   });
 
-  it('maps a query result back into scored knowledge chunks', async () => {
+  it('maps a legacy chunk without sourceType into a scored post chunk', async () => {
     const fake = new FakeChromaCollection();
     const metadata: Metadata = {
       blogName: 'AWS Architecture Blog',
@@ -132,8 +134,27 @@ describe('ChromaKnowledgeChunkRepository', () => {
       'https://aws.amazon.com/blogs/architecture/event-driven',
     );
     expect(results[0]?.chunk.metadata.chunkIndex).toBe(0);
+    expect(results[0]?.chunk.metadata.sourceType).toBe('post');
+    expect(results[0]?.chunk.metadata.sourceId).toBe(metadata.articleUrl);
     // distance 0 -> maximum similarity score of 1.
     expect(results[0]?.score).toBe(1);
+  });
+
+  it('preserves sourceId from typed post metadata', async () => {
+    const fake = new FakeChromaCollection();
+    const chunk = KnowledgeChunkMother.create({ sourceId: 'post-identity' });
+    fake.queryResponse = {
+      ids: [[chunk.id]],
+      documents: [[chunk.document]],
+      embeddings: [[chunk.embedding]],
+      metadatas: [[{ ...chunk.metadata }]],
+      distances: [[0]],
+    };
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+
+    const results = await repository.search(chunk.embedding, 1);
+
+    expect(results[0]?.chunk.metadata).toEqual(chunk.metadata);
   });
 
   it('scores every match with the cosine similarity behind its cosine distance', async () => {

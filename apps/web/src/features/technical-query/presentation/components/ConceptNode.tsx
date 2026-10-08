@@ -2,13 +2,13 @@
 
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
+import type { KnowledgeNodeSource } from '@thenodewalk/contracts';
 
 import { useSelectedConceptStore } from '../stores/useSelectedConceptStore';
 
 export interface ConceptNodeData extends Record<string, unknown> {
   label: string;
-  /** URL of the post linked to the concept, or `null` when it has none. */
-  sourceUrl: string | null;
+  source: KnowledgeNodeSource | null;
   /** Whether the concept is the central node holding the main idea of the graph. */
   isCentral: boolean;
 }
@@ -49,13 +49,14 @@ export function ConceptNode({ id, data }: NodeProps<ConceptFlowNode>): ReactElem
         </span>
       ) : null}
       {data.label}
+      {data.source === null ? null : <span className="mt-1 block text-xs font-semibold">Post</span>}
     </>
   );
 
   return (
     <div className="rounded-xl">
       <Handle type="target" position={Position.Left} className="!bg-primary" />
-      {data.sourceUrl === null ? (
+      {data.source === null ? (
         <button
           aria-label={`${accessibleLabel}, no linked source`}
           className={className}
@@ -69,7 +70,7 @@ export function ConceptNode({ id, data }: NodeProps<ConceptFlowNode>): ReactElem
         <a
           aria-label={`${accessibleLabel}, open source in a new tab`}
           className={className}
-          href={data.sourceUrl}
+          href={data.source.url}
           onClick={selectConcept}
           onFocus={selectConcept}
           rel="noreferrer noopener"

@@ -43,8 +43,18 @@ vi.mock('@xyflow/react', () => ({
 
 const GRAPH: KnowledgeGraph = {
   nodes: [
-    { id: 'kafka', label: 'Apache Kafka', type: 'concept', sourceUrl: 'https://blog.test/kafka' },
-    { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
+    {
+      id: 'kafka',
+      label: 'Apache Kafka',
+      type: 'concept',
+      source: { kind: 'post', url: 'https://blog.test/kafka' },
+    },
+    {
+      id: 'broker',
+      label: 'Broker',
+      type: 'concept',
+      source: { kind: 'post', url: 'https://blog.test/broker' },
+    },
   ],
   edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
   centralNodeId: null,
@@ -63,6 +73,8 @@ describe('KnowledgeGraphCanvas', () => {
     expect(kafkaLink).toHaveAttribute('href', 'https://blog.test/kafka');
     expect(kafkaLink).toHaveAttribute('target', '_blank');
     expect(kafkaLink).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
+    expect(kafkaLink).toHaveTextContent('Post');
+    expect(screen.getAllByText('Post')).toHaveLength(2);
 
     expect(screen.getByRole('link', { name: /broker, open source in a new tab/i })).toHaveAttribute(
       'href',
@@ -77,9 +89,9 @@ describe('KnowledgeGraphCanvas', () => {
           id: 'kafka',
           label: 'Apache Kafka',
           type: 'concept',
-          sourceUrl: 'https://blog.test/kafka',
+          source: { kind: 'post', url: 'https://blog.test/kafka' },
         },
-        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
+        { id: 'partition', label: 'Partition', type: 'concept', source: null },
       ],
       edges: [{ source: 'kafka', target: 'partition', relationship: 'splits into' }],
       centralNodeId: null,
@@ -90,6 +102,7 @@ describe('KnowledgeGraphCanvas', () => {
     const partition = screen.getByRole('button', { name: /partition, no linked source/i });
     expect(partition).toHaveAttribute('type', 'button');
     expect(partition).not.toHaveAttribute('href');
+    expect(partition).not.toHaveTextContent('Post');
     act(() => partition.focus());
     expect(partition).toHaveFocus();
     expect(useSelectedConceptStore.getState().selectedNodeId).toBe('partition');
@@ -100,15 +113,20 @@ describe('KnowledgeGraphCanvas', () => {
   it('places the central node in the middle and labels it as the main idea', () => {
     const graph: KnowledgeGraph = {
       nodes: [
-        { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/broker' },
+        {
+          id: 'broker',
+          label: 'Broker',
+          type: 'concept',
+          source: { kind: 'post', url: 'https://blog.test/broker' },
+        },
         {
           id: 'kafka',
           label: 'Apache Kafka',
           type: 'concept',
-          sourceUrl: 'https://blog.test/kafka',
+          source: { kind: 'post', url: 'https://blog.test/kafka' },
         },
-        { id: 'topic', label: 'Topic', type: 'concept', sourceUrl: null },
-        { id: 'partition', label: 'Partition', type: 'concept', sourceUrl: null },
+        { id: 'topic', label: 'Topic', type: 'concept', source: null },
+        { id: 'partition', label: 'Partition', type: 'concept', source: null },
       ],
       edges: [
         { source: 'kafka', target: 'broker', relationship: 'runs on' },

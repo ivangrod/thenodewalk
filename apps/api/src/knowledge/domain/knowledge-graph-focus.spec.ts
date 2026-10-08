@@ -18,7 +18,7 @@ function chainGraph(length: number): { graph: KnowledgeGraph; nodes: KnowledgeGr
 describe('resolveCentralNodeId', () => {
   it('keeps the central node proposed by the generator when it exists', () => {
     const mainPostUrl = faker.internet.url();
-    const mainPostNode = KnowledgeGraphNodeMother.create({ sourceUrl: mainPostUrl });
+    const mainPostNode = KnowledgeGraphNodeMother.create({ sourceId: mainPostUrl });
     const proposed = KnowledgeGraphNodeMother.create();
     const graph: KnowledgeGraph = {
       nodes: [mainPostNode, proposed],
@@ -32,8 +32,8 @@ describe('resolveCentralNodeId', () => {
   it('falls back to the first node linked to the main post when the proposed one is unknown', () => {
     const mainPostUrl = faker.internet.url();
     const other = KnowledgeGraphNodeMother.create();
-    const withoutSource = KnowledgeGraphNodeMother.create({ sourceUrl: null });
-    const mainPostNode = KnowledgeGraphNodeMother.create({ sourceUrl: mainPostUrl });
+    const withoutSource = KnowledgeGraphNodeMother.create({ sourceId: null });
+    const mainPostNode = KnowledgeGraphNodeMother.create({ sourceId: mainPostUrl });
     const graph: KnowledgeGraph = {
       nodes: [other, withoutSource, mainPostNode],
       edges: [],
@@ -44,7 +44,7 @@ describe('resolveCentralNodeId', () => {
   });
 
   it('falls back to the first node when no node is linked to the main post', () => {
-    const first = KnowledgeGraphNodeMother.create({ sourceUrl: null });
+    const first = KnowledgeGraphNodeMother.create({ sourceId: null });
     const graph: KnowledgeGraph = {
       nodes: [first, KnowledgeGraphNodeMother.create()],
       edges: [],

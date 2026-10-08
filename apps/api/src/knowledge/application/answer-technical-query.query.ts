@@ -1,6 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import type { KnowledgeGraph, TechnicalQueryResponse } from '@thenodewalk/contracts';
+import type {
+  KnowledgeGraph,
+  KnowledgeNodeSource,
+  TechnicalQueryResponse,
+} from '@thenodewalk/contracts';
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
@@ -58,43 +62,60 @@ export class AnswerTechnicalQueryQuery {
 
     const [mainMatch] = matches;
     if (!mainMatch) {
-      return { summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH };
+      return this.toResponse({ summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH }, new Map());
     }
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
-      const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
-      const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+      const sources = new Map<string, KnowledgeNodeSource>(
+        matches.map(({ chunk }) => [
+          chunk.metadata.sourceId,
+          { kind: 'post', url: chunk.metadata.articleUrl },
+        ]),
+      );
+      const sourced = assignUniqueSources(generated.graph, new Set(sources.keys()));
       const centred: KnowledgeGraphModel = {
         ...sourced,
-        centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+        centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.sourceId),
       };
-      return this.toResponse({
-        summary: generated.summary,
-        graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
-      });
+      return this.toResponse(
+        {
+          summary: generated.summary,
+          graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+        },
+        sources,
+      );
     } catch (error) {
       this.logger.warn(
         `Structured graph generation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH };
+      return this.toResponse(
+        { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH },
+        new Map(),
+      );
     }
   }
 
-  private toResponse(generated: GeneratedGraph): TechnicalQueryResponse {
+  private toResponse(
+    generated: GeneratedGraph,
+    sources: ReadonlyMap<string, KnowledgeNodeSource>,
+  ): TechnicalQueryResponse {
     return {
       summary: generated.summary,
-      graph: this.toGraph(generated.graph),
+      graph: this.toGraph(generated.graph, sources),
     };
   }
 
-  private toGraph(graph: GeneratedGraph['graph']): KnowledgeGraph {
+  private toGraph(
+    graph: GeneratedGraph['graph'],
+    sources: ReadonlyMap<string, KnowledgeNodeSource>,
+  ): KnowledgeGraph {
     return {
       nodes: graph.nodes.map((node) => ({
         id: node.id,
         label: node.label,
         type: node.type,
-        sourceUrl: node.sourceUrl,
+        source: node.sourceId === null ? null : (sources.get(node.sourceId) ?? null),
       })),
       edges: graph.edges.map((edge) => ({
         source: edge.source,

@@ -39,7 +39,7 @@ const VALID_JSON = JSON.stringify({
 });
 
 describe('OllamaStructuredGraphGenerator', () => {
-  it('requests JSON output and parses it into the domain graph preserving sourceUrl', async () => {
+  it('requests JSON output and maps sourceUrl into the domain sourceId', async () => {
     const client = new FakeOllamaChatClient(VALID_JSON);
     const generator = new OllamaStructuredGraphGenerator(client, 'llama3.1:8b');
 
@@ -49,7 +49,7 @@ describe('OllamaStructuredGraphGenerator', () => {
     expect(client.lastRequest?.model).toBe('llama3.1:8b');
     expect(result.summary).toBe('Kafka decouples producers from consumers.');
     expect(result.graph.nodes).toHaveLength(2);
-    expect(result.graph.nodes[0]?.sourceUrl).toBe('https://blog.test/kafka');
+    expect(result.graph.nodes[0]?.sourceId).toBe('https://blog.test/kafka');
     expect(result.graph.edges).toHaveLength(1);
   });
 
@@ -127,7 +127,7 @@ describe('parseGeneratedGraph', () => {
     expect(result.graph.edges[0]?.target).toBe('a');
   });
 
-  it('keeps nodes without a source with a null sourceUrl', () => {
+  it('keeps nodes without a source with a null sourceId', () => {
     const raw = JSON.stringify({
       summary: 'mixed',
       graph: {
@@ -143,7 +143,7 @@ describe('parseGeneratedGraph', () => {
 
     const result = parseGeneratedGraph(raw);
 
-    expect(result.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
+    expect(result.graph.nodes.map((node) => [node.id, node.sourceId])).toEqual([
       ['linked', 'https://blog.test/a'],
       ['null', null],
       ['empty', null],

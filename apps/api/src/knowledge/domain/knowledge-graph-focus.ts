@@ -11,15 +11,15 @@ export const MAX_GRAPH_DEPTH = 3;
  *
  * Returns `null` only when the graph has no nodes.
  */
-export function resolveCentralNodeId(graph: KnowledgeGraph, mainPostUrl: string): string | null {
+export function resolveCentralNodeId(graph: KnowledgeGraph, mainSourceId: string): string | null {
   const { nodes, centralNodeId } = graph;
 
   if (centralNodeId !== null && nodes.some((node) => node.id === centralNodeId)) {
     return centralNodeId;
   }
 
-  const mainPostNode = nodes.find((node) => node.sourceUrl === mainPostUrl);
-  return mainPostNode?.id ?? nodes[0]?.id ?? null;
+  const mainSourceNode = nodes.find((node) => node.sourceId === mainSourceId);
+  return mainSourceNode?.id ?? nodes[0]?.id ?? null;
 }
 
 /**

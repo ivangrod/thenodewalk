@@ -4,13 +4,19 @@ import { createHash } from 'node:crypto';
  * Metadata persisted alongside every chunk in the vector store. Mirrors the
  * ChromaDB `knowledge_chunks` collection metadata schema.
  */
-export interface KnowledgeChunkMetadata {
+export type KnowledgeSourceType = 'post' | 'book';
+
+export interface PostChunkMetadata {
+  sourceType: 'post';
+  sourceId: string;
   blogName: string;
   articleTitle: string;
   articleUrl: string;
   publishedAt: string;
   chunkIndex: number;
 }
+
+export type KnowledgeChunkMetadata = PostChunkMetadata;
 
 /**
  * A piece of an article ready to be indexed: its text, the embedding vector and

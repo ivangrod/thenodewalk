@@ -36,7 +36,7 @@ const RESPONSE: TechnicalQueryResponse = {
         id: 'gateway',
         label: 'API Gateway',
         type: 'concept',
-        sourceUrl: 'https://netflixtechblog.com/gateway',
+        source: { kind: 'post', url: 'https://netflixtechblog.com/gateway' },
       },
     ],
     edges: [],

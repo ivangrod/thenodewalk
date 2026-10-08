@@ -6,7 +6,18 @@ import { requestTechnicalQuery } from './technical-query.client';
 
 const RESPONSE: TechnicalQueryResponse = {
   summary: 'answer',
-  graph: { nodes: [], edges: [], centralNodeId: null },
+  graph: {
+    nodes: [
+      {
+        id: 'gateway',
+        label: 'API Gateway',
+        type: 'concept',
+        source: { kind: 'post', url: 'https://blog.test/gateway' },
+      },
+    ],
+    edges: [],
+    centralNodeId: 'gateway',
+  },
 };
 
 afterEach(() => {

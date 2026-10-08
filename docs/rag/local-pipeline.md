@@ -95,10 +95,35 @@ fully local:
     collection and run `ingest --full`.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
-contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
-web client can link it to its source, or `null` when the concept has no post. The parser
-normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node. The graph
-exposes `centralNodeId: string | null`, which is `null` only when the graph has no nodes.
+contains `source: { kind: 'post'; url: string } | null`: the retrieved post linked to the
+concept, or `null` when it has no source. This replaces the former public `sourceUrl` field;
+API and web must be deployed together. The domain carries `sourceId: string | null`, and the
+query resolves it against retrieved chunk metadata before returning the contract. The Ollama
+prompt remains at v4 with `sourceUrl`; the adapter maps that URL to the domain `sourceId` and
+normalizes missing or empty values to `null`. The graph exposes `centralNodeId: string | null`,
+which is `null` only when the graph has no nodes.
+
+### Post chunk metadata migration
+
+Post chunks in `knowledge_chunks` store `sourceType: 'post'`, `sourceId: articleUrl`, `blogName`,
+`articleTitle`, `articleUrl`, `publishedAt`, and `chunkIndex`. The identifier remains
+`sha256(articleUrl#chunkIndex)`, and the embedding scheme is unchanged. New feed ingestion
+writes these fields; legacy chunks without them are read as posts using `articleUrl` as their
+source identity.
+
+With ChromaDB running, migrate existing chunks using:
+
+```sh
+pnpm --filter @thenodewalk/api chroma:migrate
+```
+
+The CLI loads `apps/api/.env` and uses `CHROMA_URL` (default `http://localhost:8000`). It opens
+the existing collection with the precomputed-embeddings guard, reads metadata in pages of 500,
+and updates only records without `sourceType`, preserving all existing metadata, ids,
+documents, and embeddings. Re-running it updates zero already tagged records. No PostgreSQL,
+Ollama, or re-embedding is required. Avoid concurrent ingestion while paging the collection.
+This migration does not repair an incompatible embedding scheme or distance; that still
+requires rebuilding the collection. It must run before introducing source-type search filters.
 
 ## Benefits
 
@@ -165,12 +190,13 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
 
   try {
     const generated = await this.graphGenerator.generate(query, matches);
-    const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
-    const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+    const retrievedSourceIds = new Set(matches.map((match) => match.chunk.metadata.sourceId));
+    const sourced = assignUniqueSources(generated.graph, retrievedSourceIds);
     const centred = {
       ...sourced,
-      centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+      centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.sourceId),
     };
+    // Resolve domain sourceIds to contract sources from the retrieved metadata.
     return this.toResponse({
       summary: generated.summary,
       graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),

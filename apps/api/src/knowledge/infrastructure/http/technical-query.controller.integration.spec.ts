@@ -65,7 +65,7 @@ describe('POST /technical-queries (integration)', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/gateway',
+            sourceId: 'https://netflixtechblog.com/gateway',
           },
         ],
         edges: [],
@@ -89,7 +89,7 @@ describe('POST /technical-queries (integration)', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/gateway',
+            source: { kind: 'post', url: 'https://netflixtechblog.com/gateway' },
           },
         ],
         edges: [],
@@ -107,8 +107,8 @@ describe('POST /technical-queries (integration)', () => {
       summary: 'Netflix routes traffic through a gateway.',
       graph: {
         nodes: [
-          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
-          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl },
+          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceId: sourceUrl },
+          { id: 'routing', label: 'Routing', type: 'concept', sourceId: sourceUrl },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
         centralNodeId: 'gateway',
@@ -124,8 +124,13 @@ describe('POST /technical-queries (integration)', () => {
       summary: 'Netflix routes traffic through a gateway.',
       graph: {
         nodes: [
-          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
-          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null },
+          {
+            id: 'gateway',
+            label: 'API Gateway',
+            type: 'concept',
+            source: { kind: 'post', url: sourceUrl },
+          },
+          { id: 'routing', label: 'Routing', type: 'concept', source: null },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
         centralNodeId: 'gateway',

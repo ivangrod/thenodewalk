@@ -123,7 +123,7 @@ export class OllamaStructuredGraphGenerator implements StructuredGraphGenerator 
  * Parses and validates the raw LLM JSON into a {@link GeneratedGraph}. Throws
  * {@link InvalidStructuredGraphError} when the top-level shape is wrong, and
  * repairs the graph by dropping malformed nodes/edges and edges that reference
- * unknown nodes. Nodes without a usable source are kept with `sourceUrl: null`,
+ * unknown nodes. Nodes without a usable source are kept with `sourceId: null`,
  * and a missing or blank central node is returned as `centralNodeId: null`.
  */
 export function parseGeneratedGraph(raw: string): GeneratedGraph {
@@ -180,7 +180,7 @@ function normalizeNode(value: Record<string, unknown>): KnowledgeGraphNode {
     label: value.label as string,
     type: 'concept',
     // A missing, empty or non-string source means the concept has no linked post.
-    sourceUrl: nonBlankStringOrNull(value.sourceUrl),
+    sourceId: nonBlankStringOrNull(value.sourceUrl),
   };
 }
 
