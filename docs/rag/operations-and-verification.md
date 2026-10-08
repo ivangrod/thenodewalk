@@ -19,8 +19,20 @@ It logs progress per book and a summary of indexed chunks and issues. PDFs are s
 bookmarks or ten-page ranges, cleaned, and indexed with physical page references. Textless
 PDFs are reported as empty with an OCR limitation; encrypted/unreadable files are reported
 as unreadable. An unreadable book does not stop later books.
-All runs currently re-ingest books, using deterministic upserts; `--full` has the same effect
-until the incremental registry is introduced. Identical files are ingested once per run.
+Apply migrations before ingestion with `pnpm --filter @thenodewalk/api prisma:deploy`.
+Normal runs load the `ingested_books` hashes from PostgreSQL once and count known books as
+`skippedBooks`, before embedding or writing vectors. Reading/parsing still occurs to obtain
+the content hash. Renames retain their hash; changed bytes are a new book identity. The
+registry is saved from `BookIngested` only after Chroma persistence succeeds. It stores title,
+path, chunk count, ingestion time, and audit timestamps. Empty or failed books are not saved.
+Identical new files are ingested once per run.
+
+Use `--full` to bypass the registry snapshot and rebuild all books with deterministic upserts,
+especially after deleting Chroma data: PostgreSQL cannot detect missing vectors. If saving
+the registry fails, the event bus logs the error and existing vectors remain indexed; the
+book is retried on the next run. A failed initial registry read aborts before indexing.
+Previously ingested books with no registry entry are indexed once to populate it. Replacing
+file contents does not delete chunks for the old hash; source removal is not part of this CLI.
 
 The synthetic EPUB in `apps/api/test/fixtures/books/` exercises parsing without a copyrighted
 book. Automated tests cover ingestion, retrieval mapping and accessible book nodes. `/ask`

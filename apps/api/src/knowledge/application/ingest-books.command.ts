@@ -15,6 +15,7 @@ import {
   type KnowledgeChunk,
 } from '../domain/knowledge-chunk';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
+import type { IngestedBookRepository } from '../domain/ingested-book-repository';
 import { chunkText } from '../domain/text-chunker';
 import {
   BOOK_CONTENT_READER,
@@ -22,6 +23,7 @@ import {
   BOOK_INGESTION_PROGRESS_REPORTER,
   EMBEDDING_GENERATOR,
   KNOWLEDGE_CHUNK_REPOSITORY,
+  INGESTED_BOOK_REPOSITORY,
 } from './knowledge.tokens';
 
 export interface BookIngestionIssue {
@@ -47,11 +49,11 @@ export class IngestBooksCommand {
     @Inject(EVENT_BUS) private readonly eventBus: EventBus,
     @Inject(BOOK_INGESTION_PROGRESS_REPORTER)
     private readonly progress: BookIngestionProgressReporter,
+    @Inject(INGESTED_BOOK_REPOSITORY) private readonly ingestedBooks: IngestedBookRepository,
   ) {}
 
-  async execute(booksDir: string, _options: { full?: boolean } = {}): Promise<BookIngestionResult> {
-    // All books are re-ingested until the incremental registry is introduced.
-    void _options;
+  async execute(booksDir: string, options: { full?: boolean } = {}): Promise<BookIngestionResult> {
+    const knownHashes = options.full ? new Set<string>() : await this.ingestedBooks.findAllIds();
     const { books, unsupported } = await this.library.list(booksDir);
     const result: BookIngestionResult = {
       processedBooks: 0,
@@ -69,6 +71,11 @@ export class IngestBooksCommand {
       this.progress.bookStarted(progress);
       try {
         const content = await this.reader.read(file);
+        if (knownHashes.has(content.contentHash)) {
+          result.skippedBooks++;
+          this.progress.bookCompleted(progress, { sections: 0, chunks: 0 });
+          continue;
+        }
         if (storedHashes.has(content.contentHash)) {
           result.skippedBooks++;
           result.issues.push({

@@ -17,12 +17,17 @@ import {
   StubStructuredGraphGenerator,
 } from '../../application/testing/knowledge-test-doubles';
 import { KnowledgeModule } from '../knowledge.module';
+import { INGESTED_BOOK_REPOSITORY } from '../../application/knowledge.tokens';
+import { InMemoryIngestedBookRepository } from '../../application/testing/book-test-doubles';
 
 describe('book ingestion to query (integration)', () => {
   it('wires EPUB/PDF readers and returns a traceable PDF chapter with a page reference', async () => {
     const repository = new InMemoryKnowledgeChunkRepository();
     const generator = new StubStructuredGraphGenerator();
+    const ingested = new InMemoryIngestedBookRepository();
     const context = await Test.createTestingModule({ imports: [KnowledgeModule] })
+      .overrideProvider(INGESTED_BOOK_REPOSITORY)
+      .useValue(ingested)
       .overrideProvider(FEED_LAST_PUBLICATION_DATE_REPOSITORY)
       .useValue(new InMemoryFeedLastPublicationDateRepository())
       .overrideProvider(KNOWLEDGE_CHUNK_REPOSITORY)
@@ -38,6 +43,17 @@ describe('book ingestion to query (integration)', () => {
         .get(IngestBooksCommand)
         .execute(resolve(__dirname, '../../../../test/fixtures/books'));
       expect(result.indexedChunks).toBe(3);
+      expect(ingested.store.size).toBe(2);
+      const secondRun = await context
+        .get(IngestBooksCommand)
+        .execute(resolve(__dirname, '../../../../test/fixtures/books'));
+      expect(secondRun.indexedChunks).toBe(0);
+      expect(secondRun.skippedBooks).toBe(2);
+      const fullRun = await context
+        .get(IngestBooksCommand)
+        .execute(resolve(__dirname, '../../../../test/fixtures/books'), { full: true });
+      expect(fullRun.indexedChunks).toBe(3);
+      expect(ingested.store.size).toBe(2);
       const chunk = [...repository.store.values()].find(
         ({ metadata }) => metadata.sourceType === 'book' && metadata.format === 'pdf',
       )!;

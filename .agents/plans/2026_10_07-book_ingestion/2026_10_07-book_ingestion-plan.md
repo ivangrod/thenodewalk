@@ -15,8 +15,8 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T10:24:02Z'
-has_completed_all_phases: false
+last_implementation_at: '2026-10-08T10:36:37Z'
+has_completed_all_phases: true
 ---
 
 # Book ingestion and balanced book/post retrieval
@@ -411,27 +411,36 @@ safe empty response. Seven nodes is an example, not a fixed total node limit.
 
 `ingest:books` skips books already ingested unless `--full` is passed.
 
-- [ ] Database schema: table `ingested_books` (`book_id` primary key, `file_path`, `title`, `chunk_count`,
+- [x] Database schema: table `ingested_books` (`book_id` primary key, `file_path`, `title`, `chunk_count`,
       `ingested_at`) with its Prisma model and migration.
-- [ ] Domain port `IngestedBookRepository { findAllIds(): Promise<Set<string>>; save(book: IngestedBook): Promise<void> }`
+- [x] Domain port `IngestedBookRepository { findAllIds(): Promise<Set<string>>; save(book: IngestedBook): Promise<void> }`
       with a Prisma adapter.
-- [ ] Application service `SaveIngestedBookCommand.execute(book: IngestedBookPrimitives): Promise<void>`, triggered by
+- [x] Application service `SaveIngestedBookCommand.execute(book: IngestedBookPrimitives): Promise<void>`, triggered by
       the `SaveIngestedBookOnBookIngested` handler.
-- [ ] Domain event `IngestedBookSaved(bookId, occurredAt)`.
-- [ ] `IngestBooksCommand` skips known content hashes (counted as `skippedBooks`) unless `full` is set.
-- [ ] Test suites:
+- [x] Domain event `IngestedBookSaved(bookId, occurredAt)`.
+- [x] `IngestBooksCommand` skips known content hashes (counted as `skippedBooks`) unless `full` is set.
+- [x] Test suites:
   - `ingest-books.command.spec.ts`:
     - skips books already ingested.
     - re-ingests every book with `full`.
   - `save-ingested-book.command.spec.ts` (new): saves the book and emits `IngestedBookSaved`.
-- [ ] Update `docs/rag/operations-and-verification.md` with the incremental behaviour and `--full`.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Update `docs/rag/operations-and-verification.md` with the incremental behaviour and `--full`.
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Verification: all five required checks passed (177 API tests, 13 web tests), Prisma Client
+was regenerated and `prisma validate` passed. The Nest integration verifies event-driven
+registration, skipping the next run and forced re-ingestion with `full`. Unit tests cover
+registry loading failures, bypassing the snapshot with full, save failures without success
+events, and Prisma identity/timestamp mapping. The table includes created/updated audit
+timestamps and uses the agreed content hash primary key rather than a generated UUID.
+The migration is checked in but has not been deployed to the local database. Known files
+are still parsed to obtain hashes; `--full` is required after Chroma data loss.
 
 ## ⏭️ Next step
 
-Review Phase 6, then implement Phase 7 (incremental book ingestion) when explicitly requested.
+Review the completed plan and deploy the `ingested_books` migration before running book ingestion.
 
-With badges 🏷️, books 📚 and clean chapters 🧹 balanced ⚖️ and linked 🔗 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward incremental ingestion.
+With badges 🏷️, books 📚 and clean chapters 🧹 balanced ⚖️, linked 🔗 and remembered 💾 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) completes the walk.

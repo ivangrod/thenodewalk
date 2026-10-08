@@ -10,6 +10,10 @@ import { SharedModule } from '../../shared/infrastructure/shared.module';
 import { AnswerTechnicalQueryQuery } from '../application/answer-technical-query.query';
 import { IngestFeedsCommand } from '../application/ingest-feeds.command';
 import { IngestBooksCommand } from '../application/ingest-books.command';
+import { SaveIngestedBookCommand } from '../application/save-ingested-book.command';
+import { SaveIngestedBookOnBookIngested } from '../application/save-ingested-book-on-book-ingested';
+import { INGESTED_BOOK_REPOSITORY } from '../application/knowledge.tokens';
+import { PrismaIngestedBookRepository } from './persistence/prisma-ingested-book.repository';
 import {
   BOOK_CONTENT_READER,
   BOOK_LIBRARY_READER,
@@ -73,6 +77,9 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
   providers: [
     IngestFeedsCommand,
     IngestBooksCommand,
+    SaveIngestedBookCommand,
+    SaveIngestedBookOnBookIngested,
+    { provide: INGESTED_BOOK_REPOSITORY, useClass: PrismaIngestedBookRepository },
     { provide: BOOK_LIBRARY_READER, useClass: FsBookLibraryReader },
     {
       provide: BOOK_CONTENT_READER,
@@ -141,9 +148,11 @@ export class KnowledgeModule implements OnModuleInit {
   constructor(
     @Inject(EVENT_SUBSCRIBER_REGISTRY) private readonly registry: DomainEventSubscriberRegistry,
     private readonly subscriber: SaveLastPublicationDateOnKnowledgeFeedIngested,
+    private readonly bookSubscriber: SaveIngestedBookOnBookIngested,
   ) {}
 
   onModuleInit(): void {
     this.registry.register(this.subscriber);
+    this.registry.register(this.bookSubscriber);
   }
 }

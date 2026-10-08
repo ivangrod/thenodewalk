@@ -9,6 +9,7 @@ import {
   RecordingBookProgress,
   StubBookContentReader,
   StubBookLibraryReader,
+  InMemoryIngestedBookRepository,
 } from './testing/book-test-doubles';
 import {
   InMemoryKnowledgeChunkRepository,
@@ -25,26 +26,84 @@ function scenario(
   repository: InMemoryKnowledgeChunkRepository;
   bus: RecordingEventBus;
   progress: RecordingBookProgress;
+  ingested: InMemoryIngestedBookRepository;
+  embeddings: StubEmbeddingGenerator;
 } {
   const repository = new InMemoryKnowledgeChunkRepository();
   const bus = new RecordingEventBus();
   const progress = new RecordingBookProgress();
+  const ingested = new InMemoryIngestedBookRepository();
+  const embeddings = new StubEmbeddingGenerator([0.1, 0.2]);
   return {
     repository,
     bus,
     progress,
+    ingested,
+    embeddings,
     command: new IngestBooksCommand(
       new StubBookLibraryReader(books, unsupported),
       new StubBookContentReader(contents),
-      new StubEmbeddingGenerator([0.1, 0.2]),
+      embeddings,
       repository,
       bus,
       progress,
+      ingested,
     ),
   };
 }
 
 describe('IngestBooksCommand', () => {
+  it('loads hashes once and skips known books before embedding or Chroma writes', async () => {
+    const file = BookFileMother.create();
+    const content = BookContentMother.create();
+    const { command, ingested, embeddings, repository, bus } = scenario(
+      [file],
+      new Map([[file.filePath, content]]),
+    );
+    await ingested.save({
+      bookId: content.contentHash,
+      filePath: file.filePath,
+      title: content.title,
+      chunkCount: 1,
+      ingestedAt: new Date().toISOString(),
+    });
+    expect(await command.execute('/books')).toMatchObject({
+      processedBooks: 0,
+      indexedChunks: 0,
+      skippedBooks: 1,
+      issues: [],
+    });
+    expect(ingested.findAllIdsCalls).toBe(1);
+    expect(embeddings.documentBatches).toEqual([]);
+    expect(repository.upsertCalls).toEqual([]);
+    expect(bus.ofType('knowledge.book.ingested')).toEqual([]);
+  });
+
+  it('re-ingests known books with full without loading the registry', async () => {
+    const file = BookFileMother.create();
+    const content = BookContentMother.create();
+    const { command, ingested } = scenario([file], new Map([[file.filePath, content]]));
+    await ingested.save({
+      bookId: content.contentHash,
+      filePath: file.filePath,
+      title: content.title,
+      chunkCount: 1,
+      ingestedAt: new Date().toISOString(),
+    });
+    expect(await command.execute('/books', { full: true })).toMatchObject({
+      processedBooks: 1,
+      indexedChunks: 1,
+      skippedBooks: 0,
+    });
+    expect(ingested.findAllIdsCalls).toBe(0);
+  });
+
+  it('fails before embedding if the registry cannot be loaded', async () => {
+    const { command, ingested, embeddings } = scenario([], new Map());
+    jest.spyOn(ingested, 'findAllIds').mockRejectedValue(new Error('PostgreSQL unavailable'));
+    await expect(command.execute('/books')).rejects.toThrow('PostgreSQL unavailable');
+    expect(embeddings.documentBatches).toEqual([]);
+  });
   it('reports a scanned PDF without text as empty with the OCR limitation', async () => {
     const file = BookFileMother.create({ format: 'pdf' });
     const { command, repository } = scenario(

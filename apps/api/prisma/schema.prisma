@@ -26,6 +26,18 @@ model User {
   mindMaps  MindMap[]
 }
 
+model IngestedBook {
+  bookId     String   @id @map("book_id")
+  filePath   String   @map("file_path")
+  title      String
+  chunkCount Int      @map("chunk_count")
+  ingestedAt DateTime @db.Timestamptz(3) @map("ingested_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("ingested_books")
+}
+
 model MindMap {
   id        String      @id @default(cuid())
   title     String

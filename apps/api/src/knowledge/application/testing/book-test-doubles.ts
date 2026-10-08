@@ -1,5 +1,20 @@
 import type { BookContent, BookContentReader, BookFile } from '../../domain/book-content-reader';
 import type { BookLibraryReader } from '../../domain/book-library-reader';
+import type { IngestedBook } from '../../domain/ingested-book';
+import type { IngestedBookRepository } from '../../domain/ingested-book-repository';
+
+export class InMemoryIngestedBookRepository implements IngestedBookRepository {
+  readonly store = new Map<string, IngestedBook>();
+  findAllIdsCalls = 0;
+  findAllIds(): Promise<Set<string>> {
+    this.findAllIdsCalls++;
+    return Promise.resolve(new Set(this.store.keys()));
+  }
+  save(book: IngestedBook): Promise<void> {
+    this.store.set(book.bookId, book);
+    return Promise.resolve();
+  }
+}
 import type {
   BookIngestionProgress,
   BookIngestionProgressReporter,

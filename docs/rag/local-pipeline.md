@@ -152,8 +152,14 @@ are upserted individually with the existing Chroma batching. `BookIngested` is p
 after persistence; failures emit `BookIngestionFailed` and processing continues. Each run
 ends with `BooksIngestionCompleted`; progress uses the separate reporter port. Duplicate
 content is skipped only after a successful upsert within the same run. Empty, unsupported,
-duplicate and unreadable issues are summarised by the CLI. Runs currently re-ingest all
-books; `--full` is accepted for compatibility with the planned incremental registry.
+duplicate and unreadable issues are summarised by the CLI. Normal runs load known content
+hashes once through `IngestedBookRepository` and skip embedding/upserting those books. The
+`SaveIngestedBookOnBookIngested` subscriber invokes `SaveIngestedBookCommand`, persists through
+the Prisma adapter, and emits `IngestedBookSaved`. The `ingested_books` table uses the content
+hash as `book_id` primary key and stores path, title, chunk count, ingestion time and audit
+timestamps. `--full` bypasses this snapshot, including when rebuilding lost Chroma vectors.
+The current reader still parses known files to produce the hash. Failed or empty books do
+not advance the registry, and subscriber failures are logged by the existing event bus.
 
 `/ask` embeds the question once and runs two Chroma searches in parallel, filtering by
 `sourceType: 'book'` and `sourceType: 'post'`. Each fetches up to `TECHNICAL_QUERY_OVERFETCH`
