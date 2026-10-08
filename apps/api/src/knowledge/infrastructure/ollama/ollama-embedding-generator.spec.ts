@@ -21,6 +21,19 @@ class FakeOllamaEmbedClient implements OllamaEmbedClient {
 }
 
 describe('OllamaEmbeddingGenerator', () => {
+  it('splits large inputs into batches of 32 preserving order and prefixes', async () => {
+    const client = new FakeOllamaEmbedClient((input) =>
+      input.map((text) => [Number(text.split(' ').at(-1))]),
+    );
+    const generator = new OllamaEmbeddingGenerator(client, 'nomic-embed-text');
+    const documents = Array.from({ length: 65 }, (_, index) => `chunk ${index}`);
+    const embeddings = await generator.embedDocuments(documents);
+    expect(client.requests.map(({ input }) => input.length)).toEqual([32, 32, 1]);
+    expect(client.requests.flatMap(({ input }) => input)).toEqual(
+      documents.map((text) => `search_document: ${text}`),
+    );
+    expect(embeddings).toEqual(documents.map((_, index) => [index]));
+  });
   it('embeds documents in one /api/embed request with the document prefix of nomic-embed-text', async () => {
     const client = new FakeOllamaEmbedClient();
     const generator = new OllamaEmbeddingGenerator(client, 'nomic-embed-text');

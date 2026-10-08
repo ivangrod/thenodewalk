@@ -37,7 +37,7 @@ fully local:
    the run ends with a full summary. A feed whose articles were all ingested through an
    earlier feed is not `empty`: its content is indexed.
 4. `AnswerTechnicalQueryQuery` is a read-only Query. It embeds the question once with
-   `embedQuery`, retrieves the Top-K `KnowledgeSearchMatch` values, and must not mutate state
+   `embedQuery`, retrieves balanced, distinct-source `KnowledgeSearchMatch` values, and must not mutate state
    or publish events.
 5. A `StructuredGraphGenerator` receives the query plus traceable chunks (document text and
    source URL) and returns a summary and graph. Its Ollama adapter uses a versioned system
@@ -83,7 +83,7 @@ fully local:
     setting: a 128k window makes `llama3.1:8b` reserve a 16 GiB KV cache and freezes the host.
     Invalid values fail when the API boots.
 13. Documents and queries are embedded asymmetrically through two methods of the
-    `EmbeddingGenerator` port: `embedDocuments` (ingestion, one request per article) and
+    `EmbeddingGenerator` port: `embedDocuments` (ingestion, batches of at most 32 texts) and
     `embedQuery` (questions). Ingestion embeds the raw chunk. Do not prepend the article title:
     it makes the chunks of one post so similar that a single post fills the Top-K, which leaves
     the graph with fewer sources and no relevance gain. The Ollama adapter calls `/api/embed`, which
@@ -94,18 +94,134 @@ fully local:
     prefixes, embedded text, or distance) invalidates every stored vector: delete the
     collection and run `ingest --full`.
 
-The query enriches surviving, grounded nodes with `source: { articleTitle, blogName,
-publishedAt }` using retrieved chunk metadata. The first (highest-ranked) match wins
-when an article has several chunks. Blank fields and invalid dates become `null`;
-unsourced nodes have `source: null`. The LLM never generates this provenance, and the
-projection performs no writes or additional network requests. The web opens these
-details in an accessible modal before navigating to the article.
-
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
-contains a `sourceUrl: string | null`: the post (ingested article) linked to the concept so the
-web client can link it to its source, or `null` when the concept has no post. The parser
-normalizes a missing or empty `sourceUrl` to `null` instead of dropping the node. The graph
-exposes `centralNodeId: string | null`, which is `null` only when the graph has no nodes.
+contains a discriminated `source`:
+`{ kind: 'post'; url; articleTitle: string | null; blogName: string | null; publishedAt: string | null }`,
+`{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null }`,
+or `null` when it has no source. This replaces the former public `sourceUrl` field;
+API and web must be deployed together. The domain carries `sourceId: string | null`, and the
+query resolves it against retrieved chunk metadata before returning the contract. The Ollama
+prompt v5 uses opaque labels `S1..Sn`, with post titles/blogs and book titles/sections in the
+context. The adapter resolves those labels to retrieved domain identities; unknown, missing,
+or empty labels become `null`. The graph exposes `centralNodeId: string | null`,
+which is `null` only when the graph has no nodes.
+
+The query projects surviving, grounded nodes into these sources from the retrieved chunk
+metadata keyed by `sourceId`. The first (highest-ranked) match wins when a source has
+several chunks. For posts, blank fields and invalid dates become `null`; for books, a blank
+section title becomes `null` and the local file path is never exposed. The LLM never
+generates this provenance, and the projection performs no writes or additional network
+requests. The web opens post details in an accessible modal before navigating to the article.
+
+### Post chunk metadata migration
+
+Post chunks in `knowledge_chunks` store `sourceType: 'post'`, `sourceId: articleUrl`, `blogName`,
+`articleTitle`, `articleUrl`, `publishedAt`, and `chunkIndex`. The identifier remains
+`sha256(articleUrl#chunkIndex)`, and the embedding scheme is unchanged. New feed ingestion
+writes these fields; legacy chunks without them are read as posts using `articleUrl` as their
+source identity.
+
+With ChromaDB running, migrate existing chunks using:
+
+```sh
+pnpm --filter @thenodewalk/api chroma:migrate
+```
+
+The CLI loads `apps/api/.env` and uses `CHROMA_URL` (default `http://localhost:8000`). It opens
+the existing collection with the precomputed-embeddings guard, reads metadata in pages of 500,
+and updates only records without `sourceType`, preserving all existing metadata, ids,
+documents, and embeddings. Re-running it updates zero already tagged records. No PostgreSQL,
+Ollama, or re-embedding is required. Avoid concurrent ingestion while paging the collection.
+This migration does not repair an incompatible embedding scheme or distance; that still
+requires rebuilding the collection. It must run before introducing source-type search filters.
+
+### EPUB book ingestion
+
+`IngestBooksCommand` is separate from feed ingestion. Its `BookLibraryReader` lists EPUB/PDF
+files recursively in `apps/api/books/` (gitignored), or a CLI path/`BOOKS_DIR` override. Hidden
+files and symlinks are ignored. The first-level subfolder is the category. Other extensions
+are reported as unsupported. The composite reader dispatches EPUB and PDF to their adapters.
+
+The EPUB adapter reads `container.xml`, OPF metadata and spine order, and EPUB 3 navigation
+or EPUB 2 NCX titles. It extracts XHTML text via jsdom, without executing scripts or fetching
+resources, and skips navigation, non-linear and textless sections. Missing archive entries
+and corrupt XML/ZIP files are isolated as unreadable book issues.
+
+Each book's bytes yield a SHA-256 `bookId`; renaming a file preserves its identity. Each
+section is chunked independently with the existing 350-word/40-overlap chunker. Metadata is
+`sourceType: 'book'`, `sourceId: bookId#sectionIndex`, `bookId`, `bookTitle`, `authors`,
+`format`, optional `category`, `sectionTitle`, `sectionIndex`, optional `pageStart`/`pageEnd`,
+`chunkIndex`, and `filePath`. Chroma stores authors as a JSON string and omits absent optional
+values. The domain retains authors as `string[]`. IDs are `sha256(bookId#sectionIndex#chunkIndex)`.
+Local paths remain infrastructure metadata and are not returned in graph sources.
+
+Ollama embeds raw chunks in ordered batches of at most `OLLAMA_EMBED_BATCH_SIZE` (32). Books
+are upserted individually with the existing Chroma batching. `BookIngested` is published only
+after persistence; failures emit `BookIngestionFailed` and processing continues. Each run
+ends with `BooksIngestionCompleted`; progress uses the separate reporter port. Duplicate
+content is skipped only after a successful upsert within the same run. Empty, unsupported,
+duplicate and unreadable issues are summarised by the CLI. Normal runs load known content
+hashes once through `IngestedBookRepository` and skip embedding/upserting those books. The
+`SaveIngestedBookOnBookIngested` subscriber invokes `SaveIngestedBookCommand`, persists through
+the Prisma adapter, and emits `IngestedBookSaved`. The `ingested_books` table uses the content
+hash as `book_id` primary key and stores path, title, chunk count, ingestion time and audit
+timestamps. `--full` bypasses this snapshot, including when rebuilding lost Chroma vectors.
+The current reader still parses known files to produce the hash. Failed or empty books do
+not advance the registry, and subscriber failures are logged by the existing event bus.
+
+`/ask` embeds the question once and runs two Chroma searches in parallel, filtering by
+`sourceType: 'book'` and `sourceType: 'post'`. Each fetches up to `TECHNICAL_QUERY_OVERFETCH`
+(20) chunks. `selectBalancedMatches` keeps the highest-score chunk per `sourceId` before
+allocating `TECHNICAL_QUERY_TOP_K` (5) source slots. A book source is a chapter/section;
+multiple distinct sections of the same book may occupy separate slots.
+
+The target `BOOK_SOURCE_SHARE` is 0.65. Book slots are `round(total * bookShare)`, clamped
+between 1 and `total - 1`, giving 3 books and 2 posts with five slots. When a corpus has
+fewer distinct sources than its quota, unused slots go to the highest-score remaining
+sources from the other corpus. An empty corpus falls back entirely to the other; if both
+are empty the query returns its explanatory empty response. No relevance threshold is used.
+Finite overfetch may still yield fewer than five distinct sources when repeated chunks
+dominate the candidates. The final context is sorted by cosine score, making S1 the most
+relevant selected source globally rather than necessarily a book.
+
+Existing post metadata must be backfilled with `chroma:migrate` before using these filters:
+legacy records without `sourceType` do not match either filtered search. Retrieval enforces
+the context quota. After successful generation, `attachMissingSources` runs after grounding,
+central-node resolution and depth pruning, so even sources pruned from the graph are restored.
+It adds title-labelled source nodes linked directly to the centre with `retrieved source`
+edges. Missing sources appear exactly once with deterministic collision-free node ids.
+If generation returns no nodes, the first selected source becomes the centre of a source-only
+graph. No sources are fabricated when retrieval is empty or generation fails. The total node
+count is not fixed; provenance nodes can increase it while remaining one hop from the centre.
+
+### PDF extraction and cleanup
+
+`PdfBookContentReader` uses the bundled PDF.js in `unpdf`. It extracts pages sequentially,
+preserving text-item line endings for cleaning, and releases page resources and the document.
+The PDF info dictionary supplies title and author; absent titles fall back to the filename
+and absent authors to an empty list. File bytes determine the SHA-256 identity as with EPUB.
+
+Valid outline entries (including named destinations and nested bookmarks) resolve to
+physical, one-based pages. Entries are ordered by page; the first title on a shared start
+page wins. Each section ends before the next start page. Pages before the first bookmark
+form a separate page-range section. Broken or external bookmark destinations are ignored.
+Without usable bookmarks, sections span at most `PDF_SECTION_PAGE_COUNT` (10) pages.
+Sections whose titles begin with Copyright, Contents, Table of Contents or Index are skipped.
+
+The pure `cleanBookText` function normalizes NFKC ligatures, removes standalone Arabic/Roman
+page numbers and dotted TOC lines, and detects running headers/footers within the first/last
+two non-empty lines. A normalized boundary line must recur on at least three pages and 60%
+of the document; digits are normalized to recognise changing page numbers. Interior lines
+are retained. Line-end hyphenation rejoins lowercase continuations, but retains the hyphen
+before uppercase continuations (`Test-Driven`). These are heuristics: genuine lowercase
+compound words and unusual layouts may require later refinement.
+
+Empty pages remain empty strings at their original positions; they contribute no indexed
+text. Sections still carry physical `pageStart`/`pageEnd`. Current chunk metadata contains
+the whole section range rather than an exact per-chunk page. The graph shows the section
+start page. A textless PDF is reported as `empty` with `No extractable text (scanned PDF?
+OCR not supported)`. No OCR is performed. Without bookmarks, Copyright/Index page detection
+is limited to the text-cleaning heuristics; multi-column reading order is supplied by PDF.js.
 
 ## Benefits
 
@@ -163,7 +279,14 @@ export class IngestFeedsCommand {
 ```typescript
 async execute(query: string): Promise<TechnicalQueryResponse> {
   const embedding = await this.embeddings.embedQuery(query);
-  const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
+  const [books, posts] = await Promise.all([
+    this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'book' }),
+    this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'post' }),
+  ]);
+  const matches = selectBalancedMatches(books, posts, {
+    total: TECHNICAL_QUERY_TOP_K,
+    bookShare: BOOK_SOURCE_SHARE,
+  });
 
   const [mainMatch] = matches;
   if (!mainMatch) {
@@ -172,12 +295,13 @@ async execute(query: string): Promise<TechnicalQueryResponse> {
 
   try {
     const generated = await this.graphGenerator.generate(query, matches);
-    const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
-    const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+    const retrievedSourceIds = new Set(matches.map((match) => match.chunk.metadata.sourceId));
+    const sourced = assignUniqueSources(generated.graph, retrievedSourceIds);
     const centred = {
       ...sourced,
-      centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+      centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.sourceId),
     };
+    // Resolve domain sourceIds to contract sources from the retrieved metadata.
     return this.toResponse({
       summary: generated.summary,
       graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),

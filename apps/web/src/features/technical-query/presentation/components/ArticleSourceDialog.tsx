@@ -14,15 +14,15 @@ export function ArticleSourceDialog({
   onClose: () => void;
   trigger: HTMLButtonElement | null;
 }): ReactElement {
-  const source = node?.source;
+  const source = node?.source?.kind === 'post' ? node.source : null;
   const date =
     source?.publishedAt && Number.isFinite(Date.parse(source.publishedAt))
       ? new Date(source.publishedAt)
       : null;
-  const href = node?.sourceUrl && /^https?:\/\//i.test(node.sourceUrl) ? node.sourceUrl : null;
+  const href = source?.url && /^https?:\/\//i.test(source.url) ? source.url : null;
   return (
     <Dialog.Root
-      open={node !== null}
+      open={source !== null}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}

@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import type { TechnicalQueryResponse } from '@thenodewalk/contracts';
 
@@ -13,19 +13,47 @@ const RESPONSE: TechnicalQueryResponse = {
         id: 'gateway',
         label: 'API Gateway',
         type: 'concept',
-        sourceUrl: SOURCE_URL,
         source: {
+          kind: 'post',
+          url: SOURCE_URL,
           articleTitle: 'Scaling the Netflix API',
           blogName: 'Netflix',
           publishedAt: '2026-01-02T00:00:00.000Z',
         },
       },
-      { id: 'services', label: 'Microservices', type: 'concept', sourceUrl: null },
+      { id: 'services', label: 'Microservices', type: 'concept', source: null },
+      {
+        id: 'book',
+        label: 'Feedback loops',
+        type: 'concept',
+        source: {
+          kind: 'book',
+          bookTitle: 'Engineering Feedback',
+          sectionTitle: 'Small loops',
+          pageStart: null,
+        },
+      },
     ],
-    edges: [{ source: 'gateway', target: 'services', relationship: 'routes to' }],
+    edges: [
+      { source: 'gateway', target: 'services', relationship: 'routes to' },
+      { source: 'gateway', target: 'book', relationship: 'improves with' },
+    ],
     centralNodeId: 'gateway',
   },
 };
+
+/**
+ * axe samples computed colours, so a CSS transition still running (for example the
+ * selected-node `transition-colors`) yields intermediate colours and flaky contrast
+ * results. Wait for every running animation and transition to settle first.
+ */
+async function settleTransitions(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -68,6 +96,12 @@ test.describe('technical query flow', () => {
     });
     await expect(nodeLink).toBeVisible();
     await expect(nodeLink).toContainText('Main idea');
+    await expect(nodeLink).toContainText('Post');
+    const bookNode = page.getByRole('button', {
+      name: 'Feedback loops, from the book Engineering Feedback, Small loops',
+    });
+    await expect(bookNode).toBeVisible();
+    await expect(bookNode).toContainText('Book');
 
     await nodeLink.focus();
     await page.keyboard.press('Enter');
@@ -141,7 +175,7 @@ test.describe('technical query flow', () => {
               id: `node-${index}`,
               label: `Concept ${index}`,
               type: 'concept',
-              sourceUrl: null,
+              source: null,
             })),
             edges: [{ source: 'node-0', target: 'node-1', relationship: 'uses' }],
             centralNodeId: 'node-0',
@@ -168,6 +202,7 @@ test.describe('technical query flow', () => {
     await expect(page.getByText(/federated api gateway/i)).toBeVisible();
 
     await expect(page.getByRole('button', { name: /view article details/i })).toBeVisible();
+    await settleTransitions(page);
     const results = await new AxeBuilder({ page }).analyze();
     const blocking = results.violations.filter(
       (violation) => violation.impact === 'critical' || violation.impact === 'serious',
@@ -176,6 +211,7 @@ test.describe('technical query flow', () => {
     expect(blocking).toEqual([]);
     await page.getByRole('button', { name: /view article details/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
+    await settleTransitions(page);
     const modalResults = await new AxeBuilder({ page }).analyze();
     expect(
       modalResults.violations.filter(

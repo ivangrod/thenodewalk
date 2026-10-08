@@ -2,6 +2,47 @@
 
 ## Convention
 
+### Ingest local EPUB and PDF books
+
+Create `apps/api/books/` and place EPUBs/PDFs there; subfolders such as `AGILE/` become categories.
+This directory is excluded from git. With ChromaDB and Ollama available, run:
+
+```sh
+pnpm --filter @thenodewalk/api ingest:books
+pnpm --filter @thenodewalk/api ingest:books /absolute/path/to/books
+BOOKS_DIR=/absolute/path/to/books pnpm --filter @thenodewalk/api ingest:books --full
+```
+
+The CLI loads `apps/api/.env`. Its explicit path takes precedence over `BOOKS_DIR`, then the
+default API books directory. Relative paths are resolved from the API working directory.
+It logs progress per book and a summary of indexed chunks and issues. PDFs are split using
+bookmarks or ten-page ranges, cleaned, and indexed with physical page references. Textless
+PDFs are reported as empty with an OCR limitation; encrypted/unreadable files are reported
+as unreadable. An unreadable book does not stop later books.
+Apply migrations before ingestion with `pnpm --filter @thenodewalk/api prisma:deploy`.
+Normal runs load the `ingested_books` hashes from PostgreSQL once and count known books as
+`skippedBooks`, before embedding or writing vectors. Reading/parsing still occurs to obtain
+the content hash. Renames retain their hash; changed bytes are a new book identity. The
+registry is saved from `BookIngested` only after Chroma persistence succeeds. It stores title,
+path, chunk count, ingestion time, and audit timestamps. Empty or failed books are not saved.
+Identical new files are ingested once per run.
+
+Use `--full` to bypass the registry snapshot and rebuild all books with deterministic upserts,
+especially after deleting Chroma data: PostgreSQL cannot detect missing vectors. If saving
+the registry fails, the event bus logs the error and existing vectors remain indexed; the
+book is retried on the next run. A failed initial registry read aborts before indexing.
+Previously ingested books with no registry entry are indexed once to populate it. Replacing
+file contents does not delete chunks for the old hash; source removal is not part of this CLI.
+
+The synthetic EPUB in `apps/api/test/fixtures/books/` exercises parsing without a copyrighted
+book. Automated tests cover ingestion, retrieval mapping and accessible book nodes. `/ask`
+retrieves up to three book sources and two posts, filling missing slots from the other
+corpus. After successful generation all selected sources are linked: missing sources become
+title-labelled nodes connected to the centre. Run `chroma:migrate` for legacy post chunks before querying,
+as the source-type filters cannot retrieve records without `sourceType` metadata.
+
+### Local environment
+
 The TechGraph RAG MVP must be reproducible locally without hosted AI or vector services.
 Contributors run the local infrastructure, pull the required Ollama models, ingest an OPML feed
 list, and verify the API and web application through the standard test suites.

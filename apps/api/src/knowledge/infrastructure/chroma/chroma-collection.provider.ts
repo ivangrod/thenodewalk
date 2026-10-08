@@ -40,6 +40,7 @@ export interface ChromaCollectionGateway {
   query(params: {
     queryEmbeddings: number[][];
     nResults: number;
+    where?: { sourceType: 'post' | 'book' };
     include: ('documents' | 'metadatas' | 'embeddings' | 'distances')[];
   }): Promise<{
     ids: string[][];

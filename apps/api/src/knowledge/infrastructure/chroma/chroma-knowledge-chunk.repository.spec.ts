@@ -1,6 +1,7 @@
 import type { Metadata } from 'chromadb';
 
 import { KnowledgeChunkMother } from '../../domain/testing/knowledge.mother';
+import { BookChunkMother } from '../../domain/testing/book.mother';
 import type {
   ChromaCollectionGateway,
   ChromaCollectionProvider,
@@ -14,6 +15,7 @@ type UpsertParams = Parameters<ChromaCollectionGateway['upsert']>[0];
 type QueryResponse = Awaited<ReturnType<ChromaCollectionGateway['query']>>;
 
 class FakeChromaCollection implements ChromaCollectionGateway {
+  readonly queryCalls: Parameters<ChromaCollectionGateway['query']>[0][] = [];
   readonly upsertCalls: UpsertParams[] = [];
   queryResponse: QueryResponse = {
     ids: [[]],
@@ -32,7 +34,8 @@ class FakeChromaCollection implements ChromaCollectionGateway {
     return Promise.resolve();
   }
 
-  query(): Promise<QueryResponse> {
+  query(params: Parameters<ChromaCollectionGateway['query']>[0]): Promise<QueryResponse> {
+    this.queryCalls.push(params);
     return Promise.resolve(this.queryResponse);
   }
 }
@@ -46,6 +49,45 @@ class FakeChromaCollectionProvider implements ChromaCollectionProvider {
 }
 
 describe('ChromaKnowledgeChunkRepository', () => {
+  it.each(['book', 'post'] as const)(
+    'filters Chroma search by sourceType %s',
+    async (sourceType) => {
+      const fake = new FakeChromaCollection();
+      const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+      await repository.search([0.1, 0.2], 20, { sourceType });
+      expect(fake.queryCalls[0]).toMatchObject({
+        queryEmbeddings: [[0.1, 0.2]],
+        nResults: 20,
+        where: { sourceType },
+      });
+    },
+  );
+
+  it('omits the Chroma where clause for unfiltered search', async () => {
+    const fake = new FakeChromaCollection();
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+    await repository.search([0.1, 0.2], 5);
+    expect(fake.queryCalls[0]).not.toHaveProperty('where');
+  });
+  it('round-trips book metadata with JSON authors and omitted optional fields', async () => {
+    const fake = new FakeChromaCollection();
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+    const chunk = BookChunkMother.create({ authors: ['First', 'Second'] });
+    await repository.upsert([chunk]);
+    const metadata = fake.upsertParams!.metadatas[0]!;
+    expect(metadata.authors).toBe('["First","Second"]');
+    expect(metadata).not.toHaveProperty('pageStart');
+    expect(metadata).not.toHaveProperty('category');
+    fake.queryResponse = {
+      ids: [[chunk.id]],
+      documents: [[chunk.document]],
+      embeddings: [[chunk.embedding]],
+      metadatas: [[metadata]],
+      distances: [[0]],
+    };
+    const matches = await repository.search(chunk.embedding, 1);
+    expect(matches[0]?.chunk).toEqual(chunk);
+  });
   it('maps chunks and their metadata to the collection upsert payload', async () => {
     const fake = new FakeChromaCollection();
     const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
@@ -67,6 +109,8 @@ describe('ChromaKnowledgeChunkRepository', () => {
       documents: ['chunk text'],
       metadatas: [
         {
+          sourceType: 'post',
+          sourceId: 'https://netflixtechblog.com/scaling-the-edge',
           blogName: 'Netflix Tech Blog',
           articleTitle: 'Scaling the edge',
           articleUrl: 'https://netflixtechblog.com/scaling-the-edge',
@@ -106,7 +150,7 @@ describe('ChromaKnowledgeChunkRepository', () => {
     expect(CHROMA_UPSERT_BATCH_SIZE).toBeLessThanOrEqual(5461);
   });
 
-  it('maps a query result back into scored knowledge chunks', async () => {
+  it('maps a legacy chunk without sourceType into a scored post chunk', async () => {
     const fake = new FakeChromaCollection();
     const metadata: Metadata = {
       blogName: 'AWS Architecture Blog',
@@ -128,12 +172,31 @@ describe('ChromaKnowledgeChunkRepository', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.chunk.document).toBe('retrieved chunk');
-    expect(results[0]?.chunk.metadata.articleUrl).toBe(
-      'https://aws.amazon.com/blogs/architecture/event-driven',
-    );
+    expect(results[0]?.chunk.metadata).toMatchObject({
+      articleUrl: 'https://aws.amazon.com/blogs/architecture/event-driven',
+    });
     expect(results[0]?.chunk.metadata.chunkIndex).toBe(0);
+    expect(results[0]?.chunk.metadata.sourceType).toBe('post');
+    expect(results[0]?.chunk.metadata.sourceId).toBe(metadata.articleUrl);
     // distance 0 -> maximum similarity score of 1.
     expect(results[0]?.score).toBe(1);
+  });
+
+  it('preserves sourceId from typed post metadata', async () => {
+    const fake = new FakeChromaCollection();
+    const chunk = KnowledgeChunkMother.create({ sourceId: 'post-identity' });
+    fake.queryResponse = {
+      ids: [[chunk.id]],
+      documents: [[chunk.document]],
+      embeddings: [[chunk.embedding]],
+      metadatas: [[{ ...chunk.metadata }]],
+      distances: [[0]],
+    };
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+
+    const results = await repository.search(chunk.embedding, 1);
+
+    expect(results[0]?.chunk.metadata).toEqual(chunk.metadata);
   });
 
   it('scores every match with the cosine similarity behind its cosine distance', async () => {

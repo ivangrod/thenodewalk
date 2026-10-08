@@ -21,6 +21,7 @@ cypress/videos/
 !.env.example
 .vercel/
 /data_containers/
+/apps/api/books/
 
 # System files
 .DS_Store

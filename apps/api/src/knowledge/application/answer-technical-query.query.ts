@@ -1,8 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import type { KnowledgeGraph, TechnicalQueryResponse } from '@thenodewalk/contracts';
+import type {
+  KnowledgeGraph,
+  KnowledgeNodeSource,
+  TechnicalQueryResponse,
+} from '@thenodewalk/contracts';
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
+import { selectBalancedMatches } from '../domain/balanced-matches';
+import { attachMissingSources } from '../domain/attach-missing-sources';
+import type { KnowledgeChunkMetadata } from '../domain/knowledge-chunk';
 import type {
   KnowledgeChunkRepository,
   KnowledgeSearchMatch,
@@ -26,9 +33,11 @@ import {
 
 /** Number of most relevant chunks retrieved as context for a technical query. */
 export const TECHNICAL_QUERY_TOP_K = 5;
+export const TECHNICAL_QUERY_OVERFETCH = 20;
+export const BOOK_SOURCE_SHARE = 0.65;
 
 const NO_CONTEXT_SUMMARY =
-  'No indexed sources match this question yet. Ingest more engineering blogs and try again.';
+  'No indexed sources match this question yet. Ingest more books or engineering blogs and try again.';
 const GENERATION_FAILURE_SUMMARY =
   'The answer could not be generated from the retrieved sources. Please try again.';
 
@@ -37,9 +46,10 @@ const GENERATION_FAILURE_SUMMARY =
  * structured knowledge graph. It embeds the question once, retrieves the Top-K
  * chunks and asks the {@link StructuredGraphGenerator} to reason over that
  * traceable context. The generated graph is then constrained so each node can
- * only link a retrieved post, each post is linked to at most one node, and every
+ * only link a retrieved source, each source is linked to at most one node, and every
  * node is at most {@link MAX_GRAPH_DEPTH} levels away from the central node (the
- * node holding the main idea of the most relevant post).
+ * node holding the main idea of the most relevant selected source).
+ * Node provenance is projected from the retrieved chunk metadata, never from the LLM.
  * No state is mutated and no domain events are emitted.
  */
 @Injectable()
@@ -57,59 +67,103 @@ export class AnswerTechnicalQueryQuery {
 
   async execute(query: string): Promise<TechnicalQueryResponse> {
     const embedding = await this.embeddings.embedQuery(query);
-    const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
+    const [books, posts] = await Promise.all([
+      this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'book' }),
+      this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'post' }),
+    ]);
+    const matches = selectBalancedMatches(books, posts, {
+      total: TECHNICAL_QUERY_TOP_K,
+      bookShare: BOOK_SOURCE_SHARE,
+    });
 
     const [mainMatch] = matches;
     if (!mainMatch) {
-      return { summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH };
+      return this.toResponse({ summary: NO_CONTEXT_SUMMARY, graph: EMPTY_GRAPH }, new Map());
     }
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
-      const retrievedSourceUrls = new Set(matches.map((match) => match.chunk.metadata.articleUrl));
-      const sourced = assignUniqueSources(generated.graph, retrievedSourceUrls);
+      const sources = this.sourcesOf(matches);
+      const sourced = assignUniqueSources(generated.graph, new Set(sources.keys()));
       const centred: KnowledgeGraphModel = {
         ...sourced,
-        centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
+        centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.sourceId),
       };
       return this.toResponse(
         {
           summary: generated.summary,
-          graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+          graph: attachMissingSources(
+            limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+            matches.map(({ chunk }) => chunk.metadata),
+          ),
         },
-        matches,
+        sources,
       );
     } catch (error) {
       this.logger.warn(
         `Structured graph generation failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH };
+      return this.toResponse(
+        { summary: GENERATION_FAILURE_SUMMARY, graph: EMPTY_GRAPH },
+        new Map(),
+      );
     }
+  }
+
+  /**
+   * Projects the retrieved matches into contract sources keyed by `sourceId`. The
+   * first (highest-ranked) match wins when a source has several chunks.
+   */
+  private sourcesOf(matches: KnowledgeSearchMatch[]): Map<string, KnowledgeNodeSource> {
+    const sources = new Map<string, KnowledgeNodeSource>();
+    for (const { chunk } of matches) {
+      if (!sources.has(chunk.metadata.sourceId)) {
+        sources.set(chunk.metadata.sourceId, this.sourceFor(chunk.metadata));
+      }
+    }
+    return sources;
+  }
+
+  /** Blank fields and invalid publication dates become `null`. */
+  private sourceFor(metadata: KnowledgeChunkMetadata): KnowledgeNodeSource {
+    if (metadata.sourceType === 'book') {
+      return {
+        kind: 'book',
+        bookTitle: metadata.bookTitle,
+        sectionTitle: metadata.sectionTitle.trim() || null,
+        pageStart: metadata.pageStart ?? null,
+      };
+    }
+    const timestamp = metadata.publishedAt.trim() === '' ? NaN : Date.parse(metadata.publishedAt);
+    return {
+      kind: 'post',
+      url: metadata.articleUrl,
+      articleTitle: metadata.articleTitle.trim() || null,
+      blogName: metadata.blogName.trim() || null,
+      publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
+    };
   }
 
   private toResponse(
     generated: GeneratedGraph,
-    matches: KnowledgeSearchMatch[],
+    sources: ReadonlyMap<string, KnowledgeNodeSource>,
   ): TechnicalQueryResponse {
     return {
       summary: generated.summary,
-      graph: this.toGraph(generated.graph, matches),
+      graph: this.toGraph(generated.graph, sources),
     };
   }
 
-  private toGraph(graph: GeneratedGraph['graph'], matches: KnowledgeSearchMatch[]): KnowledgeGraph {
-    const sources = new Map<string, KnowledgeSearchMatch['chunk']['metadata']>();
-    for (const { chunk } of matches) {
-      if (!sources.has(chunk.metadata.articleUrl))
-        sources.set(chunk.metadata.articleUrl, chunk.metadata);
-    }
+  private toGraph(
+    graph: GeneratedGraph['graph'],
+    sources: ReadonlyMap<string, KnowledgeNodeSource>,
+  ): KnowledgeGraph {
     return {
       nodes: graph.nodes.map((node) => ({
         id: node.id,
         label: node.label,
         type: node.type,
-        sourceUrl: node.sourceUrl,
-        source: this.sourceFor(node.sourceUrl === null ? undefined : sources.get(node.sourceUrl)),
+        source: node.sourceId === null ? null : (sources.get(node.sourceId) ?? null),
       })),
       edges: graph.edges.map((edge) => ({
         source: edge.source,
@@ -117,18 +171,6 @@ export class AnswerTechnicalQueryQuery {
         relationship: edge.relationship,
       })),
       centralNodeId: graph.centralNodeId,
-    };
-  }
-
-  private sourceFor(
-    metadata: KnowledgeSearchMatch['chunk']['metadata'] | undefined,
-  ): NonNullable<KnowledgeGraph['nodes'][number]['source']> | null {
-    if (!metadata) return null;
-    const timestamp = metadata.publishedAt.trim() === '' ? NaN : Date.parse(metadata.publishedAt);
-    return {
-      articleTitle: metadata.articleTitle.trim() || null,
-      blogName: metadata.blogName.trim() || null,
-      publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
     };
   }
 }

@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, act, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { KnowledgeGraph } from '@thenodewalk/contracts';
+import type { KnowledgeGraph, KnowledgePostSource } from '@thenodewalk/contracts';
 import KnowledgeGraphCanvas from './KnowledgeGraphCanvas';
 import type { ConceptGraphNode } from './ConceptNode';
+import { useSelectedConceptStore } from '../stores/useSelectedConceptStore';
 
 vi.mock('d3-graph-react', () => ({
   Graph: ({
@@ -23,24 +24,40 @@ vi.mock('d3-graph-react', () => ({
   ),
 }));
 
+const POST_SOURCE: KnowledgePostSource = {
+  kind: 'post',
+  url: 'https://blog.test/kafka',
+  articleTitle: 'Kafka at scale',
+  blogName: 'Netflix',
+  publishedAt: '2026-01-02T00:00:00.000Z',
+};
+
 const GRAPH: KnowledgeGraph = {
   nodes: [
+    { id: 'kafka', label: 'Apache Kafka', type: 'concept', source: POST_SOURCE },
+    { id: 'broker', label: 'Broker', type: 'concept', source: null },
     {
-      id: 'kafka',
-      label: 'Apache Kafka',
+      id: 'feedback',
+      label: 'Feedback',
       type: 'concept',
-      sourceUrl: 'https://blog.test/kafka',
       source: {
-        articleTitle: 'Kafka at scale',
-        blogName: 'Netflix',
-        publishedAt: '2026-01-02T00:00:00.000Z',
+        kind: 'book',
+        bookTitle: 'Engineering Feedback',
+        sectionTitle: 'Small loops',
+        pageStart: 12,
       },
     },
-    { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: null, source: null },
   ],
-  edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
+  edges: [
+    { source: 'kafka', target: 'broker', relationship: 'contains' },
+    { source: 'kafka', target: 'feedback', relationship: 'improves with' },
+  ],
   centralNodeId: 'kafka',
 };
+
+function withPostSource(source: Partial<KnowledgePostSource>): KnowledgeGraph {
+  return { ...GRAPH, nodes: [{ ...GRAPH.nodes[0]!, source: { ...POST_SOURCE, ...source } }] };
+}
 
 describe('KnowledgeGraphCanvas', () => {
   it('opens a modal with authoritative article metadata and a new-tab link', async () => {
@@ -62,15 +79,66 @@ describe('KnowledgeGraphCanvas', () => {
     await waitFor(() => expect(node).toHaveFocus());
   });
 
+  it('identifies post and book sources with visible badges, never by colour alone', () => {
+    render(<KnowledgeGraphCanvas graph={GRAPH} />);
+    expect(
+      screen.getByRole('button', { name: 'Apache Kafka, main idea, view article details' }),
+    ).toHaveTextContent('Post');
+    expect(screen.getAllByText('Post')).toHaveLength(1);
+    expect(screen.getAllByText('Book')).toHaveLength(1);
+    const unsourced = screen.getByRole('button', { name: 'Broker, no linked source' });
+    expect(unsourced).not.toHaveTextContent('Post');
+    expect(unsourced).not.toHaveTextContent('Book');
+  });
+
+  it('renders a book section as a selectable button with its book in the accessible name', () => {
+    render(<KnowledgeGraphCanvas graph={GRAPH} />);
+    const book = screen.getByRole('button', {
+      name: 'Feedback, from the book Engineering Feedback, Small loops, page 12',
+    });
+    expect(book).toHaveTextContent('Book');
+    expect(book).not.toHaveAttribute('aria-haspopup');
+    act(() => book.focus());
+    expect(useSelectedConceptStore.getState().selectedNodeId).toBe('feedback');
+    fireEvent.click(book);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('omits an unknown section and page from the book accessible name', () => {
+    render(
+      <KnowledgeGraphCanvas
+        graph={{
+          ...GRAPH,
+          nodes: [
+            {
+              ...GRAPH.nodes[2]!,
+              source: {
+                kind: 'book',
+                bookTitle: 'Engineering Feedback',
+                sectionTitle: null,
+                pageStart: null,
+              },
+            },
+          ],
+          centralNodeId: null,
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Feedback, from the book Engineering Feedback' }),
+    ).toBeInTheDocument();
+  });
+
   it('keeps unsourced concepts selectable without opening a modal', () => {
     render(<KnowledgeGraphCanvas graph={GRAPH} />);
     fireEvent.click(screen.getByRole('button', { name: 'Broker, no linked source' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('handles old responses without metadata and closes details when the graph changes', () => {
-    const old: KnowledgeGraph = { ...GRAPH, nodes: [{ ...GRAPH.nodes[0]!, source: undefined }] };
-    const { rerender } = render(<KnowledgeGraphCanvas graph={old} />);
+  it('shows placeholders for unknown article metadata and closes details when the graph changes', () => {
+    const unknown = withPostSource({ articleTitle: null, blogName: null, publishedAt: null });
+    const { rerender } = render(<KnowledgeGraphCanvas graph={unknown} />);
     fireEvent.click(screen.getByRole('button', { name: /view article details/i }));
     expect(screen.getByRole('dialog', { name: 'Article title unavailable' })).toBeInTheDocument();
     expect(screen.getByText('Publication date unavailable')).toBeInTheDocument();
@@ -79,11 +147,7 @@ describe('KnowledgeGraphCanvas', () => {
   });
 
   it('does not expose unsafe source links', () => {
-    render(
-      <KnowledgeGraphCanvas
-        graph={{ ...GRAPH, nodes: [{ ...GRAPH.nodes[0]!, sourceUrl: 'javascript:alert(1)' }] }}
-      />,
-    );
+    render(<KnowledgeGraphCanvas graph={withPostSource({ url: 'javascript:alert(1)' })} />);
     fireEvent.click(screen.getByRole('button', { name: /view article details/i }));
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

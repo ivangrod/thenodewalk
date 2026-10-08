@@ -65,7 +65,7 @@ describe('POST /technical-queries (integration)', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/gateway',
+            sourceId: 'https://netflixtechblog.com/gateway',
           },
         ],
         edges: [],
@@ -79,7 +79,7 @@ describe('POST /technical-queries (integration)', () => {
       .expect(201);
 
     expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
-    expect(repository.searchCalls).toHaveLength(1);
+    expect(repository.searchCalls).toHaveLength(2);
     expect(generator.calls).toHaveLength(1);
     expect(response.body).toEqual({
       summary: 'Netflix relies on a federated API gateway.',
@@ -89,8 +89,9 @@ describe('POST /technical-queries (integration)', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/gateway',
             source: expect.objectContaining({
+              kind: 'post',
+              url: 'https://netflixtechblog.com/gateway',
               articleTitle: expect.any(String),
               blogName: expect.any(String),
               publishedAt: expect.any(String),
@@ -112,8 +113,8 @@ describe('POST /technical-queries (integration)', () => {
       summary: 'Netflix routes traffic through a gateway.',
       graph: {
         nodes: [
-          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
-          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl },
+          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceId: sourceUrl },
+          { id: 'routing', label: 'Routing', type: 'concept', sourceId: sourceUrl },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
         centralNodeId: 'gateway',
@@ -133,10 +134,9 @@ describe('POST /technical-queries (integration)', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl,
-            source: expect.any(Object),
+            source: expect.objectContaining({ kind: 'post', url: sourceUrl }),
           },
-          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null, source: null },
+          { id: 'routing', label: 'Routing', type: 'concept', source: null },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
         centralNodeId: 'gateway',

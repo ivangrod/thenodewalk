@@ -14,6 +14,7 @@ import type { KnowledgeChunk } from '../../domain/knowledge-chunk';
 import type {
   KnowledgeChunkRepository,
   KnowledgeSearchMatch,
+  KnowledgeSearchFilter,
 } from '../../domain/knowledge-chunk-repository';
 import type { GeneratedGraph } from '../../domain/knowledge-graph';
 import { EMPTY_GRAPH } from '../../domain/knowledge-graph';
@@ -123,7 +124,8 @@ export class StubEmbeddingGenerator implements EmbeddingGenerator {
 
 export class InMemoryKnowledgeChunkRepository implements KnowledgeChunkRepository {
   readonly upsertCalls: KnowledgeChunk[][] = [];
-  readonly searchCalls: { embedding: number[]; limit: number }[] = [];
+  readonly searchCalls: { embedding: number[]; limit: number; filter?: KnowledgeSearchFilter }[] =
+    [];
   readonly store = new Map<string, KnowledgeChunk>();
   matches: KnowledgeSearchMatch[] = [];
   failure?: Error;
@@ -137,9 +139,19 @@ export class InMemoryKnowledgeChunkRepository implements KnowledgeChunkRepositor
     return Promise.resolve();
   }
 
-  search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]> {
-    this.searchCalls.push({ embedding, limit });
-    return Promise.resolve(this.matches);
+  search(
+    embedding: number[],
+    limit: number,
+    filter?: KnowledgeSearchFilter,
+  ): Promise<KnowledgeSearchMatch[]> {
+    this.searchCalls.push({ embedding, limit, ...(filter === undefined ? {} : { filter }) });
+    return Promise.resolve(
+      this.matches
+        .filter(
+          ({ chunk }) => filter === undefined || chunk.metadata.sourceType === filter.sourceType,
+        )
+        .slice(0, limit),
+    );
   }
 
   get lastUpsert(): KnowledgeChunk[] {

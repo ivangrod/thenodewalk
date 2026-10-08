@@ -1,4 +1,7 @@
-import { AnswerTechnicalQueryQuery, TECHNICAL_QUERY_TOP_K } from './answer-technical-query.query';
+import {
+  AnswerTechnicalQueryQuery,
+  TECHNICAL_QUERY_OVERFETCH,
+} from './answer-technical-query.query';
 import {
   InMemoryKnowledgeChunkRepository,
   StubEmbeddingGenerator,
@@ -12,6 +15,7 @@ import {
 import type { KnowledgeSearchMatch } from '../domain/knowledge-chunk-repository';
 import type { GeneratedGraph, KnowledgeGraphNode } from '../domain/knowledge-graph';
 import { MAX_GRAPH_DEPTH } from '../domain/knowledge-graph-focus';
+import { BookChunkMother } from '../domain/testing/book.mother';
 
 function matchWith(articleUrl: string): KnowledgeSearchMatch {
   return { chunk: KnowledgeChunkMother.create({ articleUrl }), score: 0.9 };
@@ -32,7 +36,112 @@ function buildQuery(matches: KnowledgeSearchMatch[]): {
 }
 
 describe('AnswerTechnicalQueryQuery', () => {
-  it('joins metadata from the highest-ranked retrieved chunk and normalizes unknown fields', async () => {
+  it('covers all five balanced sources exactly once, restoring links lost to depth pruning', async () => {
+    const books = Array.from({ length: 3 }, (_, index) => ({
+      chunk: BookChunkMother.create({ bookId: `book-${index}`, sectionTitle: `Section ${index}` }),
+      score: 0.9 - index * 0.1,
+    }));
+    const posts = [matchWith('https://post.test/first'), matchWith('https://post.test/second')];
+    const { query, generator } = buildQuery([...books, ...posts]);
+    generator.result = {
+      summary: 'Balanced answer',
+      graph: {
+        nodes: [
+          KnowledgeGraphNodeMother.create({
+            id: 'central',
+            sourceId: posts[0]!.chunk.metadata.sourceId,
+          }),
+          KnowledgeGraphNodeMother.create({ id: 'concept', sourceId: null }),
+          KnowledgeGraphNodeMother.create({
+            id: 'duplicate',
+            sourceId: posts[0]!.chunk.metadata.sourceId,
+          }),
+          KnowledgeGraphNodeMother.create({
+            id: 'disconnected',
+            sourceId: books[0]!.chunk.metadata.sourceId,
+          }),
+        ],
+        edges: [
+          { source: 'central', target: 'concept', relationship: 'explains' },
+          { source: 'central', target: 'duplicate', relationship: 'relates to' },
+        ],
+        centralNodeId: 'central',
+      },
+    };
+    const response = await query.execute('Question');
+    expect(response.graph.nodes).toHaveLength(7);
+    expect(response.graph.nodes.filter(({ source }) => source?.kind === 'book')).toHaveLength(3);
+    expect(response.graph.nodes.filter(({ source }) => source?.kind === 'post')).toHaveLength(2);
+    expect(response.graph.nodes.filter(({ source }) => source === null)).toHaveLength(2);
+    expect(response.graph.nodes.some(({ id }) => id === 'disconnected')).toBe(false);
+    expect(response.graph.nodes.find(({ id }) => id === 'duplicate')?.source).toBeNull();
+    expect(response.graph.edges).toHaveLength(6);
+    expect(response.graph.edges.every(({ source }) => source === 'central')).toBe(true);
+    expect(response.summary).toBe('Balanced answer');
+  });
+
+  it('builds source nodes from an empty generated graph, while generation failures still return the safe empty response', async () => {
+    const chunk = BookChunkMother.create();
+    const { query } = buildQuery([{ chunk, score: 0.9 }]);
+    const response = await query.execute('Question');
+    expect(response.graph.nodes).toHaveLength(1);
+    expect(response.graph.centralNodeId).toBe(response.graph.nodes[0]?.id);
+    expect(response.graph.nodes[0]?.source?.kind).toBe('book');
+  });
+  it('starts both searches before either completes, then generates from balanced sources', async () => {
+    const books = Array.from({ length: 5 }, (_, index) => ({
+      chunk: BookChunkMother.create({ bookId: `book-${index}` }),
+      score: 0.8 - index * 0.1,
+    }));
+    const posts = Array.from({ length: 5 }, (_, index) => ({
+      chunk: KnowledgeChunkMother.create({ articleUrl: `https://post.test/${index}` }),
+      score: 0.9 - index * 0.1,
+    }));
+    const { query, repository, embeddings, generator } = buildQuery([]);
+    const resolvers: ((matches: KnowledgeSearchMatch[]) => void)[] = [];
+    jest.spyOn(repository, 'search').mockImplementation(
+      () =>
+        new Promise<KnowledgeSearchMatch[]>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const answering = query.execute('Question');
+    await Promise.resolve();
+    expect(resolvers).toHaveLength(2);
+    expect(generator.calls).toHaveLength(0);
+    resolvers[0]!(books);
+    resolvers[1]!(posts);
+    await answering;
+    expect(embeddings.queries).toEqual(['Question']);
+    const context = generator.calls[0]!.context;
+    expect(context.filter(({ chunk }) => chunk.metadata.sourceType === 'book')).toHaveLength(3);
+    expect(context.filter(({ chunk }) => chunk.metadata.sourceType === 'post')).toHaveLength(2);
+    expect(context[0]).toBe(posts[0]);
+    expect(context.map(({ score }) => score)).toEqual(
+      [...context.map(({ score }) => score)].sort((a, b) => b - a),
+    );
+  });
+  it('maps a retrieved book section into a book source', async () => {
+    const chunk = BookChunkMother.create();
+    const { query, generator } = buildQuery([{ chunk, score: 0.9 }]);
+    generator.result = {
+      summary: 'Book answer',
+      graph: {
+        nodes: [KnowledgeGraphNodeMother.create({ id: 'book', sourceId: chunk.metadata.sourceId })],
+        edges: [],
+        centralNodeId: 'book',
+      },
+    };
+    const response = await query.execute('What are feedback loops?');
+    expect(response.graph.nodes[0]?.source).toEqual({
+      kind: 'book',
+      bookTitle: 'Engineering Feedback',
+      sectionTitle: 'Feedback',
+      pageStart: null,
+    });
+  });
+
+  it('joins post metadata from the highest-ranked retrieved chunk and normalizes unknown fields', async () => {
     const url = 'https://blog.test/source';
     const first = {
       chunk: KnowledgeChunkMother.create({
@@ -55,13 +164,15 @@ describe('AnswerTechnicalQueryQuery', () => {
     generator.result = {
       summary: 'Summary',
       graph: {
-        nodes: [{ id: 'source', label: 'Concept', type: 'concept', sourceUrl: url }],
+        nodes: [{ id: 'source', label: 'Concept', type: 'concept', sourceId: url }],
         edges: [],
         centralNodeId: 'source',
       },
     };
     const response = await query.execute('Question');
     expect(response.graph.nodes[0]?.source).toEqual({
+      kind: 'post',
+      url,
       articleTitle: 'Indexed title',
       blogName: 'Netflix',
       publishedAt: null,
@@ -80,7 +191,7 @@ describe('AnswerTechnicalQueryQuery', () => {
             id: 'gateway',
             label: 'API Gateway',
             type: 'concept',
-            sourceUrl: 'https://netflixtechblog.com/post',
+            sourceId: 'https://netflixtechblog.com/post',
           },
         ],
         edges: [{ source: 'gateway', target: 'gateway', relationship: 'self' }],
@@ -93,14 +204,19 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
     expect(embeddings.documentBatches).toEqual([]);
-    expect(repository.searchCalls[0]?.limit).toBe(TECHNICAL_QUERY_TOP_K);
+    expect(repository.searchCalls).toEqual([
+      { embedding: [0.5, 0.5], limit: TECHNICAL_QUERY_OVERFETCH, filter: { sourceType: 'book' } },
+      { embedding: [0.5, 0.5], limit: TECHNICAL_QUERY_OVERFETCH, filter: { sourceType: 'post' } },
+    ]);
     expect(generator.calls).toHaveLength(1);
     expect(response.summary).toBe('Netflix uses a federated API gateway.');
-    expect(response.graph.nodes[0]?.sourceUrl).toBe('https://netflixtechblog.com/post');
+    expect(response.graph.nodes[0]?.source).toEqual(
+      expect.objectContaining({ kind: 'post', url: 'https://netflixtechblog.com/post' }),
+    );
     expect(response.graph.edges).toHaveLength(1);
   });
 
-  it('returns nodes without a source with a null sourceUrl', async () => {
+  it('returns nodes without a source with a null source', async () => {
     const { query, generator } = buildQuery([matchWith('https://blog.test/post')]);
     generator.result = {
       summary: 'Event sourcing stores changes as events.',
@@ -110,9 +226,9 @@ describe('AnswerTechnicalQueryQuery', () => {
             id: 'event-sourcing',
             label: 'Event Sourcing',
             type: 'concept',
-            sourceUrl: 'https://blog.test/post',
+            sourceId: 'https://blog.test/post',
           },
-          { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null },
+          { id: 'event', label: 'Domain Event', type: 'concept', sourceId: null },
         ],
         edges: [{ source: 'event-sourcing', target: 'event', relationship: 'stores' }],
         centralNodeId: 'event-sourcing',
@@ -126,13 +242,14 @@ describe('AnswerTechnicalQueryQuery', () => {
         id: 'event-sourcing',
         label: 'Event Sourcing',
         type: 'concept',
-        sourceUrl: 'https://blog.test/post',
         source: expect.objectContaining({
+          kind: 'post',
+          url: 'https://blog.test/post',
           articleTitle: expect.any(String),
           blogName: expect.any(String),
         }),
       },
-      { id: 'event', label: 'Domain Event', type: 'concept', sourceUrl: null, source: null },
+      { id: 'event', label: 'Domain Event', type: 'concept', source: null },
     ]);
     expect(response.graph.edges).toHaveLength(1);
   });
@@ -144,9 +261,9 @@ describe('AnswerTechnicalQueryQuery', () => {
       summary: 'Kafka stores records in partitioned topics.',
       graph: {
         nodes: [
-          KnowledgeGraphNodeMother.create({ id: 'kafka', sourceUrl: sharedUrl }),
-          KnowledgeGraphNodeMother.create({ id: 'topic', sourceUrl: sharedUrl }),
-          KnowledgeGraphNodeMother.create({ id: 'partition', sourceUrl: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'kafka', sourceId: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'topic', sourceId: sharedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'partition', sourceId: sharedUrl }),
         ],
         edges: [
           { source: 'kafka', target: 'topic', relationship: 'organizes' },
@@ -158,8 +275,8 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('How does Kafka store data?');
 
-    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
-      ['kafka', sharedUrl],
+    expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
+      ['kafka', expect.objectContaining({ kind: 'post', url: sharedUrl })],
       ['topic', null],
       ['partition', null],
     ]);
@@ -173,10 +290,10 @@ describe('AnswerTechnicalQueryQuery', () => {
       summary: 'A summary.',
       graph: {
         nodes: [
-          KnowledgeGraphNodeMother.create({ id: 'grounded', sourceUrl: retrievedUrl }),
+          KnowledgeGraphNodeMother.create({ id: 'grounded', sourceId: retrievedUrl }),
           KnowledgeGraphNodeMother.create({
             id: 'invented',
-            sourceUrl: 'https://blog.test/hallucinated',
+            sourceId: 'https://blog.test/hallucinated',
           }),
         ],
         edges: [KnowledgeGraphEdgeMother.create({ source: 'grounded', target: 'invented' })],
@@ -186,8 +303,8 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     const response = await query.execute('a question');
 
-    expect(response.graph.nodes.map((node) => [node.id, node.sourceUrl])).toEqual([
-      ['grounded', retrievedUrl],
+    expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
+      ['grounded', expect.objectContaining({ kind: 'post', url: retrievedUrl })],
       ['invented', null],
     ]);
     expect(response.graph.nodes[1]?.source).toBeNull();
@@ -196,10 +313,11 @@ describe('AnswerTechnicalQueryQuery', () => {
   it('returns the graph limited to 3 levels from the central node', async () => {
     const { query, generator } = buildQuery([matchWith('https://blog.test/main')]);
     const chain = Array.from({ length: MAX_GRAPH_DEPTH + 3 }, () =>
-      KnowledgeGraphNodeMother.create({ sourceUrl: null }),
+      KnowledgeGraphNodeMother.create({ sourceId: null }),
     );
     const central = chain[0] as KnowledgeGraphNode;
-    const disconnected = KnowledgeGraphNodeMother.create({ sourceUrl: null });
+    central.sourceId = 'https://blog.test/main';
+    const disconnected = KnowledgeGraphNodeMother.create({ sourceId: null });
     generator.result = {
       summary: 'A deep graph.',
       graph: {
@@ -226,8 +344,8 @@ describe('AnswerTechnicalQueryQuery', () => {
     const mainPostUrl = 'https://blog.test/main';
     const secondaryUrl = 'https://blog.test/secondary';
     const { query, generator } = buildQuery([matchWith(mainPostUrl), matchWith(secondaryUrl)]);
-    const secondary = KnowledgeGraphNodeMother.create({ sourceUrl: secondaryUrl });
-    const mainIdea = KnowledgeGraphNodeMother.create({ sourceUrl: mainPostUrl });
+    const secondary = KnowledgeGraphNodeMother.create({ sourceId: secondaryUrl });
+    const mainIdea = KnowledgeGraphNodeMother.create({ sourceId: mainPostUrl });
     generator.result = {
       summary: 'A summary.',
       graph: {
