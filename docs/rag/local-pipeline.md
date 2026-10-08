@@ -37,7 +37,7 @@ fully local:
    the run ends with a full summary. A feed whose articles were all ingested through an
    earlier feed is not `empty`: its content is indexed.
 4. `AnswerTechnicalQueryQuery` is a read-only Query. It embeds the question once with
-   `embedQuery`, retrieves the Top-K `KnowledgeSearchMatch` values, and must not mutate state
+   `embedQuery`, retrieves balanced, distinct-source `KnowledgeSearchMatch` values, and must not mutate state
    or publish events.
 5. A `StructuredGraphGenerator` receives the query plus traceable chunks (document text and
    source URL) and returns a summary and graph. Its Ollama adapter uses a versioned system
@@ -155,8 +155,24 @@ content is skipped only after a successful upsert within the same run. Empty, un
 duplicate and unreadable issues are summarised by the CLI. Runs currently re-ingest all
 books; `--full` is accepted for compatibility with the planned incremental registry.
 
-`/ask` can retrieve both source types from the same collection using the existing Top-K
-ranking. Source quotas and deterministic missing-source nodes are introduced in later phases.
+`/ask` embeds the question once and runs two Chroma searches in parallel, filtering by
+`sourceType: 'book'` and `sourceType: 'post'`. Each fetches up to `TECHNICAL_QUERY_OVERFETCH`
+(20) chunks. `selectBalancedMatches` keeps the highest-score chunk per `sourceId` before
+allocating `TECHNICAL_QUERY_TOP_K` (5) source slots. A book source is a chapter/section;
+multiple distinct sections of the same book may occupy separate slots.
+
+The target `BOOK_SOURCE_SHARE` is 0.65. Book slots are `round(total * bookShare)`, clamped
+between 1 and `total - 1`, giving 3 books and 2 posts with five slots. When a corpus has
+fewer distinct sources than its quota, unused slots go to the highest-score remaining
+sources from the other corpus. An empty corpus falls back entirely to the other; if both
+are empty the query returns its explanatory empty response. No relevance threshold is used.
+Finite overfetch may still yield fewer than five distinct sources when repeated chunks
+dominate the candidates. The final context is sorted by cosine score, making S1 the most
+relevant selected source globally rather than necessarily a book.
+
+Existing post metadata must be backfilled with `chroma:migrate` before using these filters:
+legacy records without `sourceType` do not match either filtered search. Retrieval enforces
+the context quota; deterministic graph source coverage is implemented in the next phase.
 
 ### PDF extraction and cleanup
 
@@ -243,7 +259,14 @@ export class IngestFeedsCommand {
 ```typescript
 async execute(query: string): Promise<TechnicalQueryResponse> {
   const embedding = await this.embeddings.embedQuery(query);
-  const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
+  const [books, posts] = await Promise.all([
+    this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'book' }),
+    this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'post' }),
+  ]);
+  const matches = selectBalancedMatches(books, posts, {
+    total: TECHNICAL_QUERY_TOP_K,
+    bookShare: BOOK_SOURCE_SHARE,
+  });
 
   const [mainMatch] = matches;
   if (!mainMatch) {

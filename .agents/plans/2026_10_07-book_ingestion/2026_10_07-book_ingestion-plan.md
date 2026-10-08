@@ -15,7 +15,7 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T09:45:51Z'
+last_implementation_at: '2026-10-08T10:19:12Z'
 has_completed_all_phases: false
 ---
 
@@ -336,17 +336,17 @@ and 60% of pages. Chunk page ranges remain section-level, documented in the pipe
 
 `/ask` retrieves books and posts separately and combines them with a 65/35 quota that always includes both types.
 
-- [ ] Domain port: `KnowledgeChunkRepository.search(embedding: number[], limit: number, filter?: { sourceType: KnowledgeSourceType }): Promise<KnowledgeSearchMatch[]>`.
+- [x] Domain port: `KnowledgeChunkRepository.search(embedding: number[], limit: number, filter?: { sourceType: KnowledgeSourceType }): Promise<KnowledgeSearchMatch[]>`.
       The Chroma adapter maps the filter to `where: { sourceType }`.
-- [ ] Domain `selectBalancedMatches(bookMatches, postMatches, { total, bookShare }): KnowledgeSearchMatch[]`:
+- [x] Domain `selectBalancedMatches(bookMatches, postMatches, { total, bookShare }): KnowledgeSearchMatch[]`:
   - Keeps the best chunk per `sourceId`.
   - `bookSlots = clamp(round(total * bookShare), 1, total - 1)`, which gives 3 books and 2 posts for `total = 5`.
   - Fills the free slots with the other source type when a corpus falls short.
   - Orders the result by score.
-- [ ] `AnswerTechnicalQueryQuery` embeds the question once, runs both filtered searches with `Promise.all` and
+- [x] `AnswerTechnicalQueryQuery` embeds the question once, runs both filtered searches with `Promise.all` and
       overfetch (`TECHNICAL_QUERY_OVERFETCH = 20`), and uses `BOOK_SOURCE_SHARE = 0.65`. The central node keeps using
       the best match overall.
-- [ ] Test suites:
+- [x] Test suites:
   - `balanced-matches.spec.ts` (new):
     - selects 3 books and 2 posts out of 5.
     - includes at least one source of each type when both exist.
@@ -359,11 +359,20 @@ and 60% of pages. Chunk page ranges remain section-level, documented in the pipe
     - searches books and posts in parallel with a single embedding.
     - builds the graph from the balanced matches.
   - `chroma-knowledge-chunk.repository.spec.ts`: filters the search by `sourceType`.
-- [ ] Update `docs/rag/local-pipeline.md` with the balanced retrieval rules.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Update `docs/rag/local-pipeline.md` with the balanced retrieval rules.
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Verification: all five required checks passed (164 API tests, 13 web tests).
+The selector tests cover 3/2 quotas, best-chunk deduplication, same-book distinct sections,
+corpus shortfalls/absence, score ordering, empty results and zero/one-slot configuration.
+A deferred-promise query test proves that both searches start before either resolves and
+that the generator receives the balanced context. Adapter tests verify both source filters
+and omission of `where` for unfiltered searches. Finite overfetch can still return fewer
+distinct sources than the target; this limitation and the prerequisite metadata backfill
+are documented. Source coverage in the generated graph remains Phase 6.
 
 ### Phase 6: Guaranteed source coverage in the graph
 
@@ -415,6 +424,6 @@ remaining nodes without a source.
 
 ## ⏭️ Next step
 
-Review Phase 4, then implement Phase 5 (balanced retrieval 65/35) when explicitly requested.
+Review Phase 5, then implement Phase 6 (guaranteed source coverage in the graph) when explicitly requested.
 
-With badges 🏷️, books 📚 and clean PDF chapters 🧹 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward balanced retrieval.
+With badges 🏷️, books 📚 and clean chapters 🧹 balanced ⚖️ for the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward complete source coverage.

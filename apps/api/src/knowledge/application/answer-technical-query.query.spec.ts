@@ -1,4 +1,7 @@
-import { AnswerTechnicalQueryQuery, TECHNICAL_QUERY_TOP_K } from './answer-technical-query.query';
+import {
+  AnswerTechnicalQueryQuery,
+  TECHNICAL_QUERY_OVERFETCH,
+} from './answer-technical-query.query';
 import {
   InMemoryKnowledgeChunkRepository,
   StubEmbeddingGenerator,
@@ -33,6 +36,39 @@ function buildQuery(matches: KnowledgeSearchMatch[]): {
 }
 
 describe('AnswerTechnicalQueryQuery', () => {
+  it('starts both searches before either completes, then generates from balanced sources', async () => {
+    const books = Array.from({ length: 5 }, (_, index) => ({
+      chunk: BookChunkMother.create({ bookId: `book-${index}` }),
+      score: 0.8 - index * 0.1,
+    }));
+    const posts = Array.from({ length: 5 }, (_, index) => ({
+      chunk: KnowledgeChunkMother.create({ articleUrl: `https://post.test/${index}` }),
+      score: 0.9 - index * 0.1,
+    }));
+    const { query, repository, embeddings, generator } = buildQuery([]);
+    const resolvers: ((matches: KnowledgeSearchMatch[]) => void)[] = [];
+    jest.spyOn(repository, 'search').mockImplementation(
+      () =>
+        new Promise<KnowledgeSearchMatch[]>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const answering = query.execute('Question');
+    await Promise.resolve();
+    expect(resolvers).toHaveLength(2);
+    expect(generator.calls).toHaveLength(0);
+    resolvers[0]!(books);
+    resolvers[1]!(posts);
+    await answering;
+    expect(embeddings.queries).toEqual(['Question']);
+    const context = generator.calls[0]!.context;
+    expect(context.filter(({ chunk }) => chunk.metadata.sourceType === 'book')).toHaveLength(3);
+    expect(context.filter(({ chunk }) => chunk.metadata.sourceType === 'post')).toHaveLength(2);
+    expect(context[0]).toBe(posts[0]);
+    expect(context.map(({ score }) => score)).toEqual(
+      [...context.map(({ score }) => score)].sort((a, b) => b - a),
+    );
+  });
   it('maps a retrieved book section into a book source', async () => {
     const chunk = BookChunkMother.create();
     const { query, generator } = buildQuery([{ chunk, score: 0.9 }]);
@@ -77,7 +113,10 @@ describe('AnswerTechnicalQueryQuery', () => {
 
     expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
     expect(embeddings.documentBatches).toEqual([]);
-    expect(repository.searchCalls[0]?.limit).toBe(TECHNICAL_QUERY_TOP_K);
+    expect(repository.searchCalls).toEqual([
+      { embedding: [0.5, 0.5], limit: TECHNICAL_QUERY_OVERFETCH, filter: { sourceType: 'book' } },
+      { embedding: [0.5, 0.5], limit: TECHNICAL_QUERY_OVERFETCH, filter: { sourceType: 'post' } },
+    ]);
     expect(generator.calls).toHaveLength(1);
     expect(response.summary).toBe('Netflix uses a federated API gateway.');
     expect(response.graph.nodes[0]?.source).toEqual({

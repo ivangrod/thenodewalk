@@ -24,8 +24,10 @@ until the incremental registry is introduced. Identical files are ingested once 
 
 The synthetic EPUB in `apps/api/test/fixtures/books/` exercises parsing without a copyrighted
 book. Automated tests cover ingestion, retrieval mapping and accessible book nodes. `/ask`
-still uses normal Top-K retrieval, so a book badge appears only if a book chunk is retrieved
-and linked by the model. The planned balancing phase will enforce source quotas.
+retrieves up to three book sources and two posts, filling missing slots from the other
+corpus. A book badge appears when a retrieved section is linked by the model; deterministic
+graph coverage is planned next. Run `chroma:migrate` for legacy post chunks before querying,
+as the source-type filters cannot retrieve records without `sourceType` metadata.
 
 ### Local environment
 

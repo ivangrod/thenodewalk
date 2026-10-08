@@ -1,4 +1,8 @@
-import type { KnowledgeChunk } from './knowledge-chunk';
+import type { KnowledgeChunk, KnowledgeSourceType } from './knowledge-chunk';
+
+export interface KnowledgeSearchFilter {
+  sourceType: KnowledgeSourceType;
+}
 
 /**
  * A chunk retrieved from the vector store together with its relevance score: the
@@ -16,5 +20,9 @@ export interface KnowledgeChunkRepository {
   /** Idempotently indexes the given chunks (same id overwrites, never duplicates). */
   upsert(chunks: KnowledgeChunk[]): Promise<void>;
   /** Returns the matches whose embeddings are closest to the query embedding. */
-  search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]>;
+  search(
+    embedding: number[],
+    limit: number,
+    filter?: KnowledgeSearchFilter,
+  ): Promise<KnowledgeSearchMatch[]>;
 }

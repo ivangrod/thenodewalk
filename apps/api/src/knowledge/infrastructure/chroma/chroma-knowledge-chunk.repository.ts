@@ -5,6 +5,7 @@ import type { KnowledgeChunk, KnowledgeChunkMetadata } from '../../domain/knowle
 import type {
   KnowledgeChunkRepository,
   KnowledgeSearchMatch,
+  KnowledgeSearchFilter,
 } from '../../domain/knowledge-chunk-repository';
 import type { ChromaCollectionProvider } from './chroma-collection.provider';
 
@@ -46,11 +47,16 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
     }
   }
 
-  async search(embedding: number[], limit: number): Promise<KnowledgeSearchMatch[]> {
+  async search(
+    embedding: number[],
+    limit: number,
+    filter?: KnowledgeSearchFilter,
+  ): Promise<KnowledgeSearchMatch[]> {
     const collection = await this.provider.collection();
     const result = await collection.query({
       queryEmbeddings: [embedding],
       nResults: limit,
+      ...(filter === undefined ? {} : { where: { sourceType: filter.sourceType } }),
       include: ['documents', 'metadatas', 'embeddings', 'distances'],
     });
 

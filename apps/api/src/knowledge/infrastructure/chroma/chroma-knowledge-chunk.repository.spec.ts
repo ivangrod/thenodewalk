@@ -15,6 +15,7 @@ type UpsertParams = Parameters<ChromaCollectionGateway['upsert']>[0];
 type QueryResponse = Awaited<ReturnType<ChromaCollectionGateway['query']>>;
 
 class FakeChromaCollection implements ChromaCollectionGateway {
+  readonly queryCalls: Parameters<ChromaCollectionGateway['query']>[0][] = [];
   readonly upsertCalls: UpsertParams[] = [];
   queryResponse: QueryResponse = {
     ids: [[]],
@@ -33,7 +34,8 @@ class FakeChromaCollection implements ChromaCollectionGateway {
     return Promise.resolve();
   }
 
-  query(): Promise<QueryResponse> {
+  query(params: Parameters<ChromaCollectionGateway['query']>[0]): Promise<QueryResponse> {
+    this.queryCalls.push(params);
     return Promise.resolve(this.queryResponse);
   }
 }
@@ -47,6 +49,26 @@ class FakeChromaCollectionProvider implements ChromaCollectionProvider {
 }
 
 describe('ChromaKnowledgeChunkRepository', () => {
+  it.each(['book', 'post'] as const)(
+    'filters Chroma search by sourceType %s',
+    async (sourceType) => {
+      const fake = new FakeChromaCollection();
+      const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+      await repository.search([0.1, 0.2], 20, { sourceType });
+      expect(fake.queryCalls[0]).toMatchObject({
+        queryEmbeddings: [[0.1, 0.2]],
+        nResults: 20,
+        where: { sourceType },
+      });
+    },
+  );
+
+  it('omits the Chroma where clause for unfiltered search', async () => {
+    const fake = new FakeChromaCollection();
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+    await repository.search([0.1, 0.2], 5);
+    expect(fake.queryCalls[0]).not.toHaveProperty('where');
+  });
   it('round-trips book metadata with JSON authors and omitted optional fields', async () => {
     const fake = new FakeChromaCollection();
     const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));

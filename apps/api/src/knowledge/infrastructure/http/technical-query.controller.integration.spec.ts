@@ -79,7 +79,7 @@ describe('POST /technical-queries (integration)', () => {
       .expect(201);
 
     expect(embeddings.queries).toEqual(['How does Netflix scale its API?']);
-    expect(repository.searchCalls).toHaveLength(1);
+    expect(repository.searchCalls).toHaveLength(2);
     expect(generator.calls).toHaveLength(1);
     expect(response.body).toEqual({
       summary: 'Netflix relies on a federated API gateway.',

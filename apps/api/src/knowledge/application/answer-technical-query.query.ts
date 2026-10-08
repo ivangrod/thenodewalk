@@ -7,6 +7,7 @@ import type {
 } from '@thenodewalk/contracts';
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
+import { selectBalancedMatches } from '../domain/balanced-matches';
 import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
 import type {
   GeneratedGraph,
@@ -27,6 +28,8 @@ import {
 
 /** Number of most relevant chunks retrieved as context for a technical query. */
 export const TECHNICAL_QUERY_TOP_K = 5;
+export const TECHNICAL_QUERY_OVERFETCH = 20;
+export const BOOK_SOURCE_SHARE = 0.65;
 
 const NO_CONTEXT_SUMMARY =
   'No indexed sources match this question yet. Ingest more books or engineering blogs and try again.';
@@ -38,9 +41,9 @@ const GENERATION_FAILURE_SUMMARY =
  * structured knowledge graph. It embeds the question once, retrieves the Top-K
  * chunks and asks the {@link StructuredGraphGenerator} to reason over that
  * traceable context. The generated graph is then constrained so each node can
- * only link a retrieved post, each post is linked to at most one node, and every
+ * only link a retrieved source, each source is linked to at most one node, and every
  * node is at most {@link MAX_GRAPH_DEPTH} levels away from the central node (the
- * node holding the main idea of the most relevant post).
+ * node holding the main idea of the most relevant selected source).
  * No state is mutated and no domain events are emitted.
  */
 @Injectable()
@@ -58,7 +61,14 @@ export class AnswerTechnicalQueryQuery {
 
   async execute(query: string): Promise<TechnicalQueryResponse> {
     const embedding = await this.embeddings.embedQuery(query);
-    const matches = await this.repository.search(embedding, TECHNICAL_QUERY_TOP_K);
+    const [books, posts] = await Promise.all([
+      this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'book' }),
+      this.repository.search(embedding, TECHNICAL_QUERY_OVERFETCH, { sourceType: 'post' }),
+    ]);
+    const matches = selectBalancedMatches(books, posts, {
+      total: TECHNICAL_QUERY_TOP_K,
+      bookShare: BOOK_SOURCE_SHARE,
+    });
 
     const [mainMatch] = matches;
     if (!mainMatch) {
