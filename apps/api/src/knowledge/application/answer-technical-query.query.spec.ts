@@ -140,6 +140,45 @@ describe('AnswerTechnicalQueryQuery', () => {
       pageStart: null,
     });
   });
+
+  it('joins post metadata from the highest-ranked retrieved chunk and normalizes unknown fields', async () => {
+    const url = 'https://blog.test/source';
+    const first = {
+      chunk: KnowledgeChunkMother.create({
+        articleUrl: url,
+        articleTitle: '  Indexed title  ',
+        blogName: 'Netflix',
+        publishedAt: 'invalid',
+      }),
+      score: 0.9,
+    };
+    const second = {
+      chunk: KnowledgeChunkMother.create({
+        articleUrl: url,
+        articleTitle: 'Different title',
+        blogName: 'Other origin',
+      }),
+      score: 0.8,
+    };
+    const { query, generator } = buildQuery([first, second]);
+    generator.result = {
+      summary: 'Summary',
+      graph: {
+        nodes: [{ id: 'source', label: 'Concept', type: 'concept', sourceId: url }],
+        edges: [],
+        centralNodeId: 'source',
+      },
+    };
+    const response = await query.execute('Question');
+    expect(response.graph.nodes[0]?.source).toEqual({
+      kind: 'post',
+      url,
+      articleTitle: 'Indexed title',
+      blogName: 'Netflix',
+      publishedAt: null,
+    });
+  });
+
   it('embeds the question once, retrieves Top-K context and returns summary + graph', async () => {
     const { query, embeddings, repository, generator } = buildQuery([
       matchWith('https://netflixtechblog.com/post'),
@@ -171,10 +210,9 @@ describe('AnswerTechnicalQueryQuery', () => {
     ]);
     expect(generator.calls).toHaveLength(1);
     expect(response.summary).toBe('Netflix uses a federated API gateway.');
-    expect(response.graph.nodes[0]?.source).toEqual({
-      kind: 'post',
-      url: 'https://netflixtechblog.com/post',
-    });
+    expect(response.graph.nodes[0]?.source).toEqual(
+      expect.objectContaining({ kind: 'post', url: 'https://netflixtechblog.com/post' }),
+    );
     expect(response.graph.edges).toHaveLength(1);
   });
 
@@ -204,7 +242,12 @@ describe('AnswerTechnicalQueryQuery', () => {
         id: 'event-sourcing',
         label: 'Event Sourcing',
         type: 'concept',
-        source: { kind: 'post', url: 'https://blog.test/post' },
+        source: expect.objectContaining({
+          kind: 'post',
+          url: 'https://blog.test/post',
+          articleTitle: expect.any(String),
+          blogName: expect.any(String),
+        }),
       },
       { id: 'event', label: 'Domain Event', type: 'concept', source: null },
     ]);
@@ -233,7 +276,7 @@ describe('AnswerTechnicalQueryQuery', () => {
     const response = await query.execute('How does Kafka store data?');
 
     expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
-      ['kafka', { kind: 'post', url: sharedUrl }],
+      ['kafka', expect.objectContaining({ kind: 'post', url: sharedUrl })],
       ['topic', null],
       ['partition', null],
     ]);
@@ -261,9 +304,10 @@ describe('AnswerTechnicalQueryQuery', () => {
     const response = await query.execute('a question');
 
     expect(response.graph.nodes.map((node) => [node.id, node.source])).toEqual([
-      ['grounded', { kind: 'post', url: retrievedUrl }],
+      ['grounded', expect.objectContaining({ kind: 'post', url: retrievedUrl })],
       ['invented', null],
     ]);
+    expect(response.graph.nodes[1]?.source).toBeNull();
   });
 
   it('returns the graph limited to 3 levels from the central node', async () => {

@@ -9,7 +9,7 @@ function GraphSkeleton(): ReactElement {
   return (
     <div
       aria-hidden="true"
-      className="h-[28rem] w-full animate-pulse rounded-2xl border bg-muted"
+      className="h-[36rem] w-full animate-pulse rounded-2xl border bg-muted lg:h-[calc(100vh-8rem)]"
     />
   );
 }
@@ -24,7 +24,7 @@ export interface KnowledgeGraphProps {
 }
 
 /**
- * Lazy boundary for the React Flow canvas: keeps the visualization library out
+ * Lazy boundary for the D3 canvas: keeps the visualization library out
  * of the initial bundle and off the server render (`ssr: false`).
  */
 export function KnowledgeGraph({ graph }: KnowledgeGraphProps): ReactElement {

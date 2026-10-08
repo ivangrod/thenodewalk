@@ -53,3 +53,19 @@ body {
   outline: 3px solid var(--ring);
   outline-offset: 3px;
 }
+
+/* Scoped dark palette shared by the graph and its portalled source dialog. */
+.knowledge-graph-theme {
+  --background: #0d1019;
+  --foreground: #f1f5f9;
+  --card: #11141d;
+  --card-foreground: #f1f5f9;
+  --primary: #a5b4fc;
+  --primary-foreground: #0d1019;
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #cbd5e1;
+  --border: #475569;
+  --ring: #67e8f9;
+}

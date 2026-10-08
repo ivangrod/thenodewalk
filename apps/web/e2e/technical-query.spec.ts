@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import type { TechnicalQueryResponse } from '@thenodewalk/contracts';
 
@@ -13,7 +13,13 @@ const RESPONSE: TechnicalQueryResponse = {
         id: 'gateway',
         label: 'API Gateway',
         type: 'concept',
-        source: { kind: 'post', url: SOURCE_URL },
+        source: {
+          kind: 'post',
+          url: SOURCE_URL,
+          articleTitle: 'Scaling the Netflix API',
+          blogName: 'Netflix',
+          publishedAt: '2026-01-02T00:00:00.000Z',
+        },
       },
       { id: 'services', label: 'Microservices', type: 'concept', source: null },
       {
@@ -35,6 +41,19 @@ const RESPONSE: TechnicalQueryResponse = {
     centralNodeId: 'gateway',
   },
 };
+
+/**
+ * axe samples computed colours, so a CSS transition still running (for example the
+ * selected-node `transition-colors`) yields intermediate colours and flaky contrast
+ * results. Wait for every running animation and transition to settle first.
+ */
+async function settleTransitions(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -72,11 +91,10 @@ test.describe('technical query flow', () => {
 
     await expect(page.getByText(/federated api gateway/i)).toBeVisible();
 
-    const nodeLink = page.getByRole('link', {
-      name: /api gateway, main idea, open source in a new tab/i,
+    const nodeLink = page.getByRole('button', {
+      name: /api gateway, main idea, view article details/i,
     });
     await expect(nodeLink).toBeVisible();
-    await expect(nodeLink).toHaveAttribute('href', SOURCE_URL);
     await expect(nodeLink).toContainText('Main idea');
     await expect(nodeLink).toContainText('Post');
     const bookNode = page.getByRole('button', {
@@ -85,12 +103,29 @@ test.describe('technical query flow', () => {
     await expect(bookNode).toBeVisible();
     await expect(bookNode).toContainText('Book');
 
-    const popup = await Promise.all([page.waitForEvent('popup'), nodeLink.click()]).then(
+    await nodeLink.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog', { name: 'Scaling the Netflix API' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('January 2, 2026')).toBeVisible();
+    for (let index = 0; index < 4; index += 1) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
+        true,
+      );
+    }
+    const sourceLink = dialog.getByRole('link', { name: /go to netflix/i });
+    await expect(sourceLink).toHaveAttribute('href', SOURCE_URL);
+
+    const popup = await Promise.all([page.waitForEvent('popup'), sourceLink.click()]).then(
       ([openedPopup]) => openedPopup,
     );
     await popup.waitForLoadState();
     expect(popup.url()).toBe(SOURCE_URL);
     await popup.close();
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(nodeLink).toBeFocused();
   });
 
   test('renders a concept without a source as a selectable, non-link button', async ({ page }) => {
@@ -111,6 +146,52 @@ test.describe('technical query flow', () => {
     await expect(conceptButton).toHaveClass(/bg-primary/);
   });
 
+  test('supports zoom controls and graph replacement on a narrow viewport with reduced motion', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/ask');
+    const search = page.getByRole('searchbox', { name: /ask a technical question/i });
+    await search.fill('First graph');
+    await page.getByRole('button', { name: /^search$/i }).click();
+    const node = page.getByRole('button', {
+      name: /api gateway, main idea, view article details/i,
+    });
+    await expect(node).toBeVisible();
+    const group = page.getByRole('figure').locator('svg > g');
+    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+    await expect(group).toHaveAttribute('transform', /scale\(1\.25\)/);
+    await page.getByRole('button', { name: 'Reset view' }).click();
+    await expect(group).toHaveAttribute('transform', /scale\(1\)/);
+    await page.route('**/technical-queries', async (route) => {
+      await route.fulfill({
+        status: 201,
+        headers: CORS_HEADERS,
+        json: {
+          ...RESPONSE,
+          graph: {
+            nodes: Array.from({ length: 7 }, (_, index) => ({
+              id: `node-${index}`,
+              label: `Concept ${index}`,
+              type: 'concept',
+              source: null,
+            })),
+            edges: [{ source: 'node-0', target: 'node-1', relationship: 'uses' }],
+            centralNodeId: 'node-0',
+          },
+        },
+      });
+    });
+    await search.fill('Second graph');
+    await page.getByRole('button', { name: /^search$/i }).click();
+    await expect(node).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Concept 0, main idea, no linked source' }),
+    ).toBeVisible();
+    await expect(page.locator('.knowledge-graph button')).toHaveCount(7);
+  });
+
   test('the query flow has no critical or serious accessibility violations', async ({ page }) => {
     await page.goto('/ask');
 
@@ -120,11 +201,22 @@ test.describe('technical query flow', () => {
     await page.getByRole('button', { name: /search/i }).click();
     await expect(page.getByText(/federated api gateway/i)).toBeVisible();
 
+    await expect(page.getByRole('button', { name: /view article details/i })).toBeVisible();
+    await settleTransitions(page);
     const results = await new AxeBuilder({ page }).analyze();
     const blocking = results.violations.filter(
       (violation) => violation.impact === 'critical' || violation.impact === 'serious',
     );
 
     expect(blocking).toEqual([]);
+    await page.getByRole('button', { name: /view article details/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await settleTransitions(page);
+    const modalResults = await new AxeBuilder({ page }).analyze();
+    expect(
+      modalResults.violations.filter(
+        (violation) => violation.impact === 'critical' || violation.impact === 'serious',
+      ),
+    ).toEqual([]);
   });
 });

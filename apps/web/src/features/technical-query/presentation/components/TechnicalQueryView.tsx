@@ -23,24 +23,33 @@ export function TechnicalQueryView(): ReactElement {
   return (
     <section
       aria-labelledby="technical-query-title"
-      className="mx-auto flex w-full max-w-3xl flex-col gap-8"
+      className="mx-auto grid w-full max-w-[1600px] gap-8 lg:grid-cols-[minmax(420px,510px)_minmax(0,1fr)] lg:gap-10"
     >
-      <header className="flex flex-col gap-3">
-        <h1
-          className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
-          id="technical-query-title"
-        >
-          Ask a technical question
-        </h1>
-        <p className="text-pretty text-lg leading-8 text-muted-foreground">
-          Query the collected engineering knowledge and explore the answer as a connected graph of
-          concepts, each linking back to its original source.
-        </p>
-      </header>
+      <div className="flex min-w-0 flex-col gap-6">
+        <header className="flex flex-col gap-3">
+          <h1
+            className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
+            id="technical-query-title"
+          >
+            Ask a technical question
+          </h1>
+          <p className="text-pretty text-lg leading-8 text-muted-foreground">
+            Query the collected engineering knowledge and explore the answer as a connected graph of
+            concepts, each linking back to its original source.
+          </p>
+        </header>
 
-      <TechnicalQueryForm disabled={isLoading} onSubmit={(query) => void ask(query)} />
+        <TechnicalQueryForm disabled={isLoading} onSubmit={(query) => void ask(query)} />
 
-      <div aria-live="polite" className="flex flex-col gap-4">
+        {hasGraph && data !== null && (
+          <article className="flex flex-col gap-3 rounded-2xl border bg-card p-5">
+            <h2 className="text-xl font-semibold tracking-tight">Summary</h2>
+            <p className="text-pretty leading-7">{data.summary}</p>
+          </article>
+        )}
+      </div>
+
+      <div aria-live="polite" className="min-w-0">
         {status === 'idle' && <PlaceholderRegion message={IDLE_MESSAGE} />}
 
         {status === 'loading' && <PlaceholderRegion message={LOADING_MESSAGE} />}
@@ -63,13 +72,7 @@ export function TechnicalQueryView(): ReactElement {
           <PlaceholderRegion message={EMPTY_MESSAGE} />
         )}
 
-        {hasGraph && data !== null && (
-          <article className="flex flex-col gap-4">
-            <h2 className="text-xl font-semibold tracking-tight">Summary</h2>
-            <p className="text-pretty leading-7">{data.summary}</p>
-            <KnowledgeGraph graph={data.graph} />
-          </article>
-        )}
+        {hasGraph && data !== null && <KnowledgeGraph graph={data.graph} />}
       </div>
     </section>
   );
@@ -77,7 +80,7 @@ export function TechnicalQueryView(): ReactElement {
 
 function PlaceholderRegion({ message }: { message: string }): ReactElement {
   return (
-    <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed bg-card p-8 text-center">
+    <div className="grid min-h-[36rem] place-items-center rounded-2xl border border-dashed bg-card p-8 text-center lg:min-h-[calc(100vh-8rem)]">
       <p className="max-w-md text-pretty text-muted-foreground">{message}</p>
     </div>
   );

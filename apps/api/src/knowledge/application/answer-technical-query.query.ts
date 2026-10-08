@@ -9,7 +9,11 @@ import type {
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import { selectBalancedMatches } from '../domain/balanced-matches';
 import { attachMissingSources } from '../domain/attach-missing-sources';
-import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
+import type { KnowledgeChunkMetadata } from '../domain/knowledge-chunk';
+import type {
+  KnowledgeChunkRepository,
+  KnowledgeSearchMatch,
+} from '../domain/knowledge-chunk-repository';
 import type {
   GeneratedGraph,
   KnowledgeGraph as KnowledgeGraphModel,
@@ -45,6 +49,7 @@ const GENERATION_FAILURE_SUMMARY =
  * only link a retrieved source, each source is linked to at most one node, and every
  * node is at most {@link MAX_GRAPH_DEPTH} levels away from the central node (the
  * node holding the main idea of the most relevant selected source).
+ * Node provenance is projected from the retrieved chunk metadata, never from the LLM.
  * No state is mutated and no domain events are emitted.
  */
 @Injectable()
@@ -78,19 +83,7 @@ export class AnswerTechnicalQueryQuery {
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
-      const sources = new Map<string, KnowledgeNodeSource>(
-        matches.map(({ chunk }) => [
-          chunk.metadata.sourceId,
-          chunk.metadata.sourceType === 'post'
-            ? { kind: 'post', url: chunk.metadata.articleUrl }
-            : {
-                kind: 'book',
-                bookTitle: chunk.metadata.bookTitle,
-                sectionTitle: chunk.metadata.sectionTitle || null,
-                pageStart: chunk.metadata.pageStart ?? null,
-              },
-        ]),
-      );
+      const sources = this.sourcesOf(matches);
       const sourced = assignUniqueSources(generated.graph, new Set(sources.keys()));
       const centred: KnowledgeGraphModel = {
         ...sourced,
@@ -115,6 +108,40 @@ export class AnswerTechnicalQueryQuery {
         new Map(),
       );
     }
+  }
+
+  /**
+   * Projects the retrieved matches into contract sources keyed by `sourceId`. The
+   * first (highest-ranked) match wins when a source has several chunks.
+   */
+  private sourcesOf(matches: KnowledgeSearchMatch[]): Map<string, KnowledgeNodeSource> {
+    const sources = new Map<string, KnowledgeNodeSource>();
+    for (const { chunk } of matches) {
+      if (!sources.has(chunk.metadata.sourceId)) {
+        sources.set(chunk.metadata.sourceId, this.sourceFor(chunk.metadata));
+      }
+    }
+    return sources;
+  }
+
+  /** Blank fields and invalid publication dates become `null`. */
+  private sourceFor(metadata: KnowledgeChunkMetadata): KnowledgeNodeSource {
+    if (metadata.sourceType === 'book') {
+      return {
+        kind: 'book',
+        bookTitle: metadata.bookTitle,
+        sectionTitle: metadata.sectionTitle.trim() || null,
+        pageStart: metadata.pageStart ?? null,
+      };
+    }
+    const timestamp = metadata.publishedAt.trim() === '' ? NaN : Date.parse(metadata.publishedAt);
+    return {
+      kind: 'post',
+      url: metadata.articleUrl,
+      articleTitle: metadata.articleTitle.trim() || null,
+      blogName: metadata.blogName.trim() || null,
+      publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
+    };
   }
 
   private toResponse(

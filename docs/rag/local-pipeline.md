@@ -95,7 +95,8 @@ fully local:
     collection and run `ingest --full`.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
-contains a discriminated `source`: `{ kind: 'post'; url: string }`,
+contains a discriminated `source`:
+`{ kind: 'post'; url; articleTitle: string | null; blogName: string | null; publishedAt: string | null }`,
 `{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null }`,
 or `null` when it has no source. This replaces the former public `sourceUrl` field;
 API and web must be deployed together. The domain carries `sourceId: string | null`, and the
@@ -104,6 +105,13 @@ prompt v5 uses opaque labels `S1..Sn`, with post titles/blogs and book titles/se
 context. The adapter resolves those labels to retrieved domain identities; unknown, missing,
 or empty labels become `null`. The graph exposes `centralNodeId: string | null`,
 which is `null` only when the graph has no nodes.
+
+The query projects surviving, grounded nodes into these sources from the retrieved chunk
+metadata keyed by `sourceId`. The first (highest-ranked) match wins when a source has
+several chunks. For posts, blank fields and invalid dates become `null`; for books, a blank
+section title becomes `null` and the local file path is never exposed. The LLM never
+generates this provenance, and the projection performs no writes or additional network
+requests. The web opens post details in an accessible modal before navigating to the article.
 
 ### Post chunk metadata migration
 
