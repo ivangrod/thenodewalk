@@ -90,6 +90,11 @@ describe('POST /technical-queries (integration)', () => {
             label: 'API Gateway',
             type: 'concept',
             sourceUrl: 'https://netflixtechblog.com/gateway',
+            source: expect.objectContaining({
+              articleTitle: expect.any(String),
+              blogName: expect.any(String),
+              publishedAt: expect.any(String),
+            }),
           },
         ],
         edges: [],
@@ -124,8 +129,14 @@ describe('POST /technical-queries (integration)', () => {
       summary: 'Netflix routes traffic through a gateway.',
       graph: {
         nodes: [
-          { id: 'gateway', label: 'API Gateway', type: 'concept', sourceUrl },
-          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null },
+          {
+            id: 'gateway',
+            label: 'API Gateway',
+            type: 'concept',
+            sourceUrl,
+            source: expect.any(Object),
+          },
+          { id: 'routing', label: 'Routing', type: 'concept', sourceUrl: null, source: null },
         ],
         edges: [{ source: 'gateway', target: 'routing', relationship: 'performs' }],
         centralNodeId: 'gateway',

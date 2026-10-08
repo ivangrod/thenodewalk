@@ -3,7 +3,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { KnowledgeGraph, TechnicalQueryResponse } from '@thenodewalk/contracts';
 
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
-import type { KnowledgeChunkRepository } from '../domain/knowledge-chunk-repository';
+import type {
+  KnowledgeChunkRepository,
+  KnowledgeSearchMatch,
+} from '../domain/knowledge-chunk-repository';
 import type {
   GeneratedGraph,
   KnowledgeGraph as KnowledgeGraphModel,
@@ -69,10 +72,13 @@ export class AnswerTechnicalQueryQuery {
         ...sourced,
         centralNodeId: resolveCentralNodeId(sourced, mainMatch.chunk.metadata.articleUrl),
       };
-      return this.toResponse({
-        summary: generated.summary,
-        graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
-      });
+      return this.toResponse(
+        {
+          summary: generated.summary,
+          graph: limitGraphDepth(centred, MAX_GRAPH_DEPTH),
+        },
+        matches,
+      );
     } catch (error) {
       this.logger.warn(
         `Structured graph generation failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -81,20 +87,29 @@ export class AnswerTechnicalQueryQuery {
     }
   }
 
-  private toResponse(generated: GeneratedGraph): TechnicalQueryResponse {
+  private toResponse(
+    generated: GeneratedGraph,
+    matches: KnowledgeSearchMatch[],
+  ): TechnicalQueryResponse {
     return {
       summary: generated.summary,
-      graph: this.toGraph(generated.graph),
+      graph: this.toGraph(generated.graph, matches),
     };
   }
 
-  private toGraph(graph: GeneratedGraph['graph']): KnowledgeGraph {
+  private toGraph(graph: GeneratedGraph['graph'], matches: KnowledgeSearchMatch[]): KnowledgeGraph {
+    const sources = new Map<string, KnowledgeSearchMatch['chunk']['metadata']>();
+    for (const { chunk } of matches) {
+      if (!sources.has(chunk.metadata.articleUrl))
+        sources.set(chunk.metadata.articleUrl, chunk.metadata);
+    }
     return {
       nodes: graph.nodes.map((node) => ({
         id: node.id,
         label: node.label,
         type: node.type,
         sourceUrl: node.sourceUrl,
+        source: this.sourceFor(node.sourceUrl === null ? undefined : sources.get(node.sourceUrl)),
       })),
       edges: graph.edges.map((edge) => ({
         source: edge.source,
@@ -102,6 +117,18 @@ export class AnswerTechnicalQueryQuery {
         relationship: edge.relationship,
       })),
       centralNodeId: graph.centralNodeId,
+    };
+  }
+
+  private sourceFor(
+    metadata: KnowledgeSearchMatch['chunk']['metadata'] | undefined,
+  ): NonNullable<KnowledgeGraph['nodes'][number]['source']> | null {
+    if (!metadata) return null;
+    const timestamp = metadata.publishedAt.trim() === '' ? NaN : Date.parse(metadata.publishedAt);
+    return {
+      articleTitle: metadata.articleTitle.trim() || null,
+      blogName: metadata.blogName.trim() || null,
+      publishedAt: Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null,
     };
   }
 }
