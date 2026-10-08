@@ -132,7 +132,7 @@ requires rebuilding the collection. It must run before introducing source-type s
 `IngestBooksCommand` is separate from feed ingestion. Its `BookLibraryReader` lists EPUB/PDF
 files recursively in `apps/api/books/` (gitignored), or a CLI path/`BOOKS_DIR` override. Hidden
 files and symlinks are ignored. The first-level subfolder is the category. Other extensions
-are reported as unsupported. PDF parsing is not enabled yet and is reported as unsupported.
+are reported as unsupported. The composite reader dispatches EPUB and PDF to their adapters.
 
 The EPUB adapter reads `container.xml`, OPF metadata and spine order, and EPUB 3 navigation
 or EPUB 2 NCX titles. It extracts XHTML text via jsdom, without executing scripts or fetching
@@ -157,6 +157,35 @@ books; `--full` is accepted for compatibility with the planned incremental regis
 
 `/ask` can retrieve both source types from the same collection using the existing Top-K
 ranking. Source quotas and deterministic missing-source nodes are introduced in later phases.
+
+### PDF extraction and cleanup
+
+`PdfBookContentReader` uses the bundled PDF.js in `unpdf`. It extracts pages sequentially,
+preserving text-item line endings for cleaning, and releases page resources and the document.
+The PDF info dictionary supplies title and author; absent titles fall back to the filename
+and absent authors to an empty list. File bytes determine the SHA-256 identity as with EPUB.
+
+Valid outline entries (including named destinations and nested bookmarks) resolve to
+physical, one-based pages. Entries are ordered by page; the first title on a shared start
+page wins. Each section ends before the next start page. Pages before the first bookmark
+form a separate page-range section. Broken or external bookmark destinations are ignored.
+Without usable bookmarks, sections span at most `PDF_SECTION_PAGE_COUNT` (10) pages.
+Sections whose titles begin with Copyright, Contents, Table of Contents or Index are skipped.
+
+The pure `cleanBookText` function normalizes NFKC ligatures, removes standalone Arabic/Roman
+page numbers and dotted TOC lines, and detects running headers/footers within the first/last
+two non-empty lines. A normalized boundary line must recur on at least three pages and 60%
+of the document; digits are normalized to recognise changing page numbers. Interior lines
+are retained. Line-end hyphenation rejoins lowercase continuations, but retains the hyphen
+before uppercase continuations (`Test-Driven`). These are heuristics: genuine lowercase
+compound words and unusual layouts may require later refinement.
+
+Empty pages remain empty strings at their original positions; they contribute no indexed
+text. Sections still carry physical `pageStart`/`pageEnd`. Current chunk metadata contains
+the whole section range rather than an exact per-chunk page. The graph shows the section
+start page. A textless PDF is reported as `empty` with `No extractable text (scanned PDF?
+OCR not supported)`. No OCR is performed. Without bookmarks, Copyright/Index page detection
+is limited to the text-cleaning heuristics; multi-column reading order is supplied by PDF.js.
 
 ## Benefits
 

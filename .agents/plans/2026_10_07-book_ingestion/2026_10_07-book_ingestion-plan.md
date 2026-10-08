@@ -15,7 +15,7 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T09:38:16Z'
+last_implementation_at: '2026-10-08T09:45:51Z'
 has_completed_all_phases: false
 ---
 
@@ -289,21 +289,21 @@ are JSON-encoded at the adapter boundary; optional metadata fields are omitted.
 
 `ingest:books` also indexes PDF books, with sections, page ranges and cleaned text.
 
-- [ ] Infrastructure adapter `PdfBookContentReader`:
+- [x] Infrastructure adapter `PdfBookContentReader`:
   - Builds sections from the PDF outline with `pageStart` and `pageEnd`.
   - Falls back to fixed page-range sections when there is no outline.
   - Reads title and authors from the PDF info dictionary, falling back to the file name.
-- [ ] Domain `cleanBookText(pages: string[]): string[]`:
+- [x] Domain `cleanBookText(pages: string[]): string[]`:
   - Removes running headers and footers repeated across pages, and standalone page numbers.
   - Drops dot-leader table of contents lines and blank pages.
   - Joins words hyphenated across lines (`develop-\nment` becomes `development`) and keeps compound-word hyphens when the
     next word starts with an uppercase letter (`Test-\nDriven` becomes `Test-Driven`).
   - Normalizes ligatures with NFKC.
-- [ ] Skip front and back matter sections by title (Copyright, Contents, Index).
-- [ ] `CompositeBookContentReader` dispatches PDF files to the new adapter.
-- [ ] A PDF without extractable text is reported as `empty` with the reason
+- [x] Skip front and back matter sections by title (Copyright, Contents, Index).
+- [x] `CompositeBookContentReader` dispatches PDF files to the new adapter.
+- [x] A PDF without extractable text is reported as `empty` with the reason
       `No extractable text (scanned PDF? OCR not supported)`.
-- [ ] Test suites:
+- [x] Test suites:
   - `book-text-cleaner.spec.ts` (new):
     - removes repeated running headers.
     - removes standalone page numbers.
@@ -318,11 +318,19 @@ are JSON-encoded at the adapter boundary; optional metadata fields are omitted.
     - reads the title from metadata or the file name.
     - returns no sections for a PDF without text.
   - `ingest-books.command.spec.ts`: reports a scanned PDF as `empty`.
-- [ ] Update `docs/rag/local-pipeline.md` with the PDF cleanup rules and limitations.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Update `docs/rag/local-pipeline.md` with the PDF cleanup rules and limitations.
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Verification: all five required checks passed (149 API tests, 13 web tests).
+Reader tests use actual PDFs: the existing fixture plus original generated documents for
+named destinations, no outline, front/back matter, text cleanup, blank pages and corrupt input.
+The Nest integration now ingests both EPUB and PDF and resolves a PDF chapter with page 1.
+Blank pages retain their positions for physical page references. Without valid bookmarks,
+sections use ten-page windows. Boundary-line detection requires at least three occurrences
+and 60% of pages. Chunk page ranges remain section-level, documented in the pipeline.
 
 ### Phase 5: Balanced retrieval 65/35
 
@@ -407,6 +415,6 @@ remaining nodes without a source.
 
 ## ⏭️ Next step
 
-Review Phase 3, then implement Phase 4 (PDF ingestion with text cleanup) when explicitly requested.
+Review Phase 4, then implement Phase 5 (balanced retrieval 65/35) when explicitly requested.
 
-With badges 🏷️ and books 📚 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward PDF chapters.
+With badges 🏷️, books 📚 and clean PDF chapters 🧹 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward balanced retrieval.

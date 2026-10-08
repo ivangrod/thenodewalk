@@ -17,6 +17,7 @@ import {
 } from '../application/knowledge.tokens';
 import { FsBookLibraryReader } from './books/fs-book-library.reader';
 import { EpubBookContentReader } from './books/epub-book-content.reader';
+import { PdfBookContentReader } from './books/pdf-book-content.reader';
 import { CompositeBookContentReader } from './books/composite-book-content.reader';
 import { LoggerBookIngestionProgressReporter } from './logging/logger-book-ingestion-progress-reporter';
 import {
@@ -76,7 +77,7 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
     {
       provide: BOOK_CONTENT_READER,
       useFactory: (): CompositeBookContentReader =>
-        new CompositeBookContentReader(new EpubBookContentReader()),
+        new CompositeBookContentReader(new EpubBookContentReader(), new PdfBookContentReader()),
     },
     { provide: BOOK_INGESTION_PROGRESS_REPORTER, useClass: LoggerBookIngestionProgressReporter },
     SaveLastPublicationDateCommand,

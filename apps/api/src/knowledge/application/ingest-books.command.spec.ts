@@ -45,6 +45,22 @@ function scenario(
 }
 
 describe('IngestBooksCommand', () => {
+  it('reports a scanned PDF without text as empty with the OCR limitation', async () => {
+    const file = BookFileMother.create({ format: 'pdf' });
+    const { command, repository } = scenario(
+      [file],
+      new Map([[file.filePath, BookContentMother.create({ sections: [] })]]),
+    );
+    const result = await command.execute('/books');
+    expect(result.issues).toEqual([
+      {
+        filePath: file.filePath,
+        type: 'empty',
+        reason: 'No extractable text (scanned PDF? OCR not supported)',
+      },
+    ]);
+    expect(repository.store.size).toBe(0);
+  });
   it('indexes sections separately, stores category and publishes events after persistence', async () => {
     const file = BookFileMother.create();
     const content = BookContentMother.create();

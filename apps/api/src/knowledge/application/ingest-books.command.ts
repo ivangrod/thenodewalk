@@ -106,7 +106,10 @@ export class IngestBooksCommand {
           result.issues.push({
             filePath: file.filePath,
             type: 'empty',
-            reason: 'No extractable book text',
+            reason:
+              file.format === 'pdf'
+                ? 'No extractable text (scanned PDF? OCR not supported)'
+                : 'No extractable book text',
           });
           result.processedBooks++;
           this.progress.bookCompleted(progress, { sections: content.sections.length, chunks: 0 });

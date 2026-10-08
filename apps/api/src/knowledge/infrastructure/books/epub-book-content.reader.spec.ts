@@ -7,6 +7,7 @@ import JSZip from 'jszip';
 import { BookFileMother } from '../../domain/testing/book.mother';
 import { EpubBookContentReader } from './epub-book-content.reader';
 import { CompositeBookContentReader } from './composite-book-content.reader';
+import { PdfBookContentReader } from './pdf-book-content.reader';
 
 const FIXTURE = resolve(__dirname, '../../../../test/fixtures/books/sample.epub');
 
@@ -82,7 +83,7 @@ describe('EpubBookContentReader', () => {
     }
   });
 
-  it('fails clearly on corrupt archives and reports PDF as unsupported', async () => {
+  it('fails clearly on corrupt archives and dispatches PDF to its reader', async () => {
     const root = await mkdtemp(join(tmpdir(), 'tnw-corrupt-'));
     try {
       const filePath = join(root, 'broken.epub');
@@ -90,11 +91,16 @@ describe('EpubBookContentReader', () => {
       await expect(
         new EpubBookContentReader().read(BookFileMother.create({ filePath })),
       ).rejects.toThrow();
-      await expect(
-        new CompositeBookContentReader(new EpubBookContentReader()).read(
-          BookFileMother.create({ format: 'pdf' }),
-        ),
-      ).rejects.toThrow('Unsupported book format: pdf');
+      const pdf = await new CompositeBookContentReader(
+        new EpubBookContentReader(),
+        new PdfBookContentReader(),
+      ).read(
+        BookFileMother.create({
+          format: 'pdf',
+          filePath: resolve(__dirname, '../../../../test/fixtures/books/sample.pdf'),
+        }),
+      );
+      expect(pdf.sections).toHaveLength(2);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

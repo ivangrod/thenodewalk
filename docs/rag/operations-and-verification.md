@@ -2,9 +2,9 @@
 
 ## Convention
 
-### Ingest local EPUB books
+### Ingest local EPUB and PDF books
 
-Create `apps/api/books/` and place EPUBs there; subfolders such as `AGILE/` become categories.
+Create `apps/api/books/` and place EPUBs/PDFs there; subfolders such as `AGILE/` become categories.
 This directory is excluded from git. With ChromaDB and Ollama available, run:
 
 ```sh
@@ -15,8 +15,10 @@ BOOKS_DIR=/absolute/path/to/books pnpm --filter @thenodewalk/api ingest:books --
 
 The CLI loads `apps/api/.env`. Its explicit path takes precedence over `BOOKS_DIR`, then the
 default API books directory. Relative paths are resolved from the API working directory.
-It logs progress per book and a summary of indexed chunks and issues. PDFs currently appear
-as unsupported; EPUBs without text are empty. An unreadable book does not stop later books.
+It logs progress per book and a summary of indexed chunks and issues. PDFs are split using
+bookmarks or ten-page ranges, cleaned, and indexed with physical page references. Textless
+PDFs are reported as empty with an OCR limitation; encrypted/unreadable files are reported
+as unreadable. An unreadable book does not stop later books.
 All runs currently re-ingest books, using deterministic upserts; `--full` has the same effect
 until the incremental registry is introduced. Identical files are ingested once per run.
 

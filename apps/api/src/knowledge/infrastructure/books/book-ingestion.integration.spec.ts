@@ -18,8 +18,8 @@ import {
 } from '../../application/testing/knowledge-test-doubles';
 import { KnowledgeModule } from '../knowledge.module';
 
-describe('EPUB ingestion to query (integration)', () => {
-  it('wires the real filesystem/EPUB readers and returns a traceable book node', async () => {
+describe('book ingestion to query (integration)', () => {
+  it('wires EPUB/PDF readers and returns a traceable PDF chapter with a page reference', async () => {
     const repository = new InMemoryKnowledgeChunkRepository();
     const generator = new StubStructuredGraphGenerator();
     const context = await Test.createTestingModule({ imports: [KnowledgeModule] })
@@ -37,8 +37,10 @@ describe('EPUB ingestion to query (integration)', () => {
       const result = await context
         .get(IngestBooksCommand)
         .execute(resolve(__dirname, '../../../../test/fixtures/books'));
-      expect(result.indexedChunks).toBe(1);
-      const chunk = [...repository.store.values()][0]!;
+      expect(result.indexedChunks).toBe(3);
+      const chunk = [...repository.store.values()].find(
+        ({ metadata }) => metadata.sourceType === 'book' && metadata.format === 'pdf',
+      )!;
       repository.matches = [{ chunk, score: 0.9 }];
       generator.result = {
         summary: 'Use short feedback loops',
@@ -62,7 +64,7 @@ describe('EPUB ingestion to query (integration)', () => {
         kind: 'book',
         bookTitle: 'Sample Engineering Book',
         sectionTitle: 'Small feedback loops',
-        pageStart: null,
+        pageStart: 1,
       });
     } finally {
       await context.close();
