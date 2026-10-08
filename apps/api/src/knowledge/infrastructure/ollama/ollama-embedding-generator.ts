@@ -25,6 +25,7 @@ export interface EmbeddingTaskPrefixes {
 }
 
 const NO_TASK_PREFIXES: EmbeddingTaskPrefixes = { document: '', query: '' };
+export const OLLAMA_EMBED_BATCH_SIZE = 32;
 
 /** Known retrieval models by Ollama name, without the `:tag` suffix. */
 const TASK_PREFIXES_BY_MODEL: ReadonlyMap<string, EmbeddingTaskPrefixes> = new Map([
@@ -64,7 +65,17 @@ export class OllamaEmbeddingGenerator implements EmbeddingGenerator {
     if (documents.length === 0) {
       return [];
     }
-    return this.embed(documents.map((document) => `${this.prefixes.document}${document}`));
+    const embeddings: number[][] = [];
+    for (let start = 0; start < documents.length; start += OLLAMA_EMBED_BATCH_SIZE) {
+      embeddings.push(
+        ...(await this.embed(
+          documents
+            .slice(start, start + OLLAMA_EMBED_BATCH_SIZE)
+            .map((document) => `${this.prefixes.document}${document}`),
+        )),
+      );
+    }
+    return embeddings;
   }
 
   async embedQuery(query: string): Promise<number[]> {

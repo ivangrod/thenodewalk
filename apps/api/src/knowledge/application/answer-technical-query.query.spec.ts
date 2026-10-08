@@ -12,6 +12,7 @@ import {
 import type { KnowledgeSearchMatch } from '../domain/knowledge-chunk-repository';
 import type { GeneratedGraph, KnowledgeGraphNode } from '../domain/knowledge-graph';
 import { MAX_GRAPH_DEPTH } from '../domain/knowledge-graph-focus';
+import { BookChunkMother } from '../domain/testing/book.mother';
 
 function matchWith(articleUrl: string): KnowledgeSearchMatch {
   return { chunk: KnowledgeChunkMother.create({ articleUrl }), score: 0.9 };
@@ -32,6 +33,25 @@ function buildQuery(matches: KnowledgeSearchMatch[]): {
 }
 
 describe('AnswerTechnicalQueryQuery', () => {
+  it('maps a retrieved book section into a book source', async () => {
+    const chunk = BookChunkMother.create();
+    const { query, generator } = buildQuery([{ chunk, score: 0.9 }]);
+    generator.result = {
+      summary: 'Book answer',
+      graph: {
+        nodes: [KnowledgeGraphNodeMother.create({ id: 'book', sourceId: chunk.metadata.sourceId })],
+        edges: [],
+        centralNodeId: 'book',
+      },
+    };
+    const response = await query.execute('What are feedback loops?');
+    expect(response.graph.nodes[0]?.source).toEqual({
+      kind: 'book',
+      bookTitle: 'Engineering Feedback',
+      sectionTitle: 'Feedback',
+      pageStart: null,
+    });
+  });
   it('embeds the question once, retrieves Top-K context and returns summary + graph', async () => {
     const { query, embeddings, repository, generator } = buildQuery([
       matchWith('https://netflixtechblog.com/post'),

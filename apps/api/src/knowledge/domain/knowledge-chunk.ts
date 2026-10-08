@@ -16,7 +16,23 @@ export interface PostChunkMetadata {
   chunkIndex: number;
 }
 
-export type KnowledgeChunkMetadata = PostChunkMetadata;
+export interface BookChunkMetadata {
+  sourceType: 'book';
+  sourceId: string;
+  bookId: string;
+  bookTitle: string;
+  authors: string[];
+  format: 'epub' | 'pdf';
+  category?: string;
+  sectionTitle: string;
+  sectionIndex: number;
+  pageStart?: number;
+  pageEnd?: number;
+  chunkIndex: number;
+  filePath: string;
+}
+
+export type KnowledgeChunkMetadata = PostChunkMetadata | BookChunkMetadata;
 
 /**
  * A piece of an article ready to be indexed: its text, the embedding vector and
@@ -42,8 +58,12 @@ export function knowledgeChunkId(articleUrl: string, chunkIndex: number): string
 }
 
 export function createKnowledgeChunk(primitives: KnowledgeChunkPrimitives): KnowledgeChunk {
+  const { metadata } = primitives;
   return {
-    id: knowledgeChunkId(primitives.metadata.articleUrl, primitives.metadata.chunkIndex),
+    id:
+      metadata.sourceType === 'post'
+        ? knowledgeChunkId(metadata.articleUrl, metadata.chunkIndex)
+        : knowledgeChunkId(`${metadata.bookId}#${metadata.sectionIndex}`, metadata.chunkIndex),
     ...primitives,
   };
 }

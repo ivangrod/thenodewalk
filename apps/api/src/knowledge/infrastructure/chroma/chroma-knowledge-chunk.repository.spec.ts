@@ -1,6 +1,7 @@
 import type { Metadata } from 'chromadb';
 
 import { KnowledgeChunkMother } from '../../domain/testing/knowledge.mother';
+import { BookChunkMother } from '../../domain/testing/book.mother';
 import type {
   ChromaCollectionGateway,
   ChromaCollectionProvider,
@@ -46,6 +47,25 @@ class FakeChromaCollectionProvider implements ChromaCollectionProvider {
 }
 
 describe('ChromaKnowledgeChunkRepository', () => {
+  it('round-trips book metadata with JSON authors and omitted optional fields', async () => {
+    const fake = new FakeChromaCollection();
+    const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
+    const chunk = BookChunkMother.create({ authors: ['First', 'Second'] });
+    await repository.upsert([chunk]);
+    const metadata = fake.upsertParams!.metadatas[0]!;
+    expect(metadata.authors).toBe('["First","Second"]');
+    expect(metadata).not.toHaveProperty('pageStart');
+    expect(metadata).not.toHaveProperty('category');
+    fake.queryResponse = {
+      ids: [[chunk.id]],
+      documents: [[chunk.document]],
+      embeddings: [[chunk.embedding]],
+      metadatas: [[metadata]],
+      distances: [[0]],
+    };
+    const matches = await repository.search(chunk.embedding, 1);
+    expect(matches[0]?.chunk).toEqual(chunk);
+  });
   it('maps chunks and their metadata to the collection upsert payload', async () => {
     const fake = new FakeChromaCollection();
     const repository = new ChromaKnowledgeChunkRepository(new FakeChromaCollectionProvider(fake));
@@ -130,9 +150,9 @@ describe('ChromaKnowledgeChunkRepository', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]?.chunk.document).toBe('retrieved chunk');
-    expect(results[0]?.chunk.metadata.articleUrl).toBe(
-      'https://aws.amazon.com/blogs/architecture/event-driven',
-    );
+    expect(results[0]?.chunk.metadata).toMatchObject({
+      articleUrl: 'https://aws.amazon.com/blogs/architecture/event-driven',
+    });
     expect(results[0]?.chunk.metadata.chunkIndex).toBe(0);
     expect(results[0]?.chunk.metadata.sourceType).toBe('post');
     expect(results[0]?.chunk.metadata.sourceId).toBe(metadata.articleUrl);

@@ -7,7 +7,9 @@ export interface TechnicalQueryRequest {
   query: string;
 }
 
-export type KnowledgeNodeSource = { kind: 'post'; url: string };
+export type KnowledgeNodeSource =
+  | { kind: 'post'; url: string }
+  | { kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null };
 
 /** A concept linked to a retrieved source, or `null` when it has none. */
 export interface KnowledgeGraphNode {

@@ -29,7 +29,7 @@ import {
 export const TECHNICAL_QUERY_TOP_K = 5;
 
 const NO_CONTEXT_SUMMARY =
-  'No indexed sources match this question yet. Ingest more engineering blogs and try again.';
+  'No indexed sources match this question yet. Ingest more books or engineering blogs and try again.';
 const GENERATION_FAILURE_SUMMARY =
   'The answer could not be generated from the retrieved sources. Please try again.';
 
@@ -70,7 +70,14 @@ export class AnswerTechnicalQueryQuery {
       const sources = new Map<string, KnowledgeNodeSource>(
         matches.map(({ chunk }) => [
           chunk.metadata.sourceId,
-          { kind: 'post', url: chunk.metadata.articleUrl },
+          chunk.metadata.sourceType === 'post'
+            ? { kind: 'post', url: chunk.metadata.articleUrl }
+            : {
+                kind: 'book',
+                bookTitle: chunk.metadata.bookTitle,
+                sectionTitle: chunk.metadata.sectionTitle || null,
+                pageStart: chunk.metadata.pageStart ?? null,
+              },
         ]),
       );
       const sourced = assignUniqueSources(generated.graph, new Set(sources.keys()));

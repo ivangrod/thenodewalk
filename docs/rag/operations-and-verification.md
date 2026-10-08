@@ -2,6 +2,31 @@
 
 ## Convention
 
+### Ingest local EPUB books
+
+Create `apps/api/books/` and place EPUBs there; subfolders such as `AGILE/` become categories.
+This directory is excluded from git. With ChromaDB and Ollama available, run:
+
+```sh
+pnpm --filter @thenodewalk/api ingest:books
+pnpm --filter @thenodewalk/api ingest:books /absolute/path/to/books
+BOOKS_DIR=/absolute/path/to/books pnpm --filter @thenodewalk/api ingest:books --full
+```
+
+The CLI loads `apps/api/.env`. Its explicit path takes precedence over `BOOKS_DIR`, then the
+default API books directory. Relative paths are resolved from the API working directory.
+It logs progress per book and a summary of indexed chunks and issues. PDFs currently appear
+as unsupported; EPUBs without text are empty. An unreadable book does not stop later books.
+All runs currently re-ingest books, using deterministic upserts; `--full` has the same effect
+until the incremental registry is introduced. Identical files are ingested once per run.
+
+The synthetic EPUB in `apps/api/test/fixtures/books/` exercises parsing without a copyrighted
+book. Automated tests cover ingestion, retrieval mapping and accessible book nodes. `/ask`
+still uses normal Top-K retrieval, so a book badge appears only if a book chunk is retrieved
+and linked by the model. The planned balancing phase will enforce source quotas.
+
+### Local environment
+
 The TechGraph RAG MVP must be reproducible locally without hosted AI or vector services.
 Contributors run the local infrastructure, pull the required Ollama models, ingest an OPML feed
 list, and verify the API and web application through the standard test suites.

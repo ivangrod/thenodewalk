@@ -83,7 +83,7 @@ fully local:
     setting: a 128k window makes `llama3.1:8b` reserve a 16 GiB KV cache and freezes the host.
     Invalid values fail when the API boots.
 13. Documents and queries are embedded asymmetrically through two methods of the
-    `EmbeddingGenerator` port: `embedDocuments` (ingestion, one request per article) and
+    `EmbeddingGenerator` port: `embedDocuments` (ingestion, batches of at most 32 texts) and
     `embedQuery` (questions). Ingestion embeds the raw chunk. Do not prepend the article title:
     it makes the chunks of one post so similar that a single post fills the Top-K, which leaves
     the graph with fewer sources and no relevance gain. The Ollama adapter calls `/api/embed`, which
@@ -95,12 +95,14 @@ fully local:
     collection and run `ingest --full`.
 
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
-contains `source: { kind: 'post'; url: string } | null`: the retrieved post linked to the
-concept, or `null` when it has no source. This replaces the former public `sourceUrl` field;
+contains a discriminated `source`: `{ kind: 'post'; url: string }`,
+`{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null }`,
+or `null` when it has no source. This replaces the former public `sourceUrl` field;
 API and web must be deployed together. The domain carries `sourceId: string | null`, and the
 query resolves it against retrieved chunk metadata before returning the contract. The Ollama
-prompt remains at v4 with `sourceUrl`; the adapter maps that URL to the domain `sourceId` and
-normalizes missing or empty values to `null`. The graph exposes `centralNodeId: string | null`,
+prompt v5 uses opaque labels `S1..Sn`, with post titles/blogs and book titles/sections in the
+context. The adapter resolves those labels to retrieved domain identities; unknown, missing,
+or empty labels become `null`. The graph exposes `centralNodeId: string | null`,
 which is `null` only when the graph has no nodes.
 
 ### Post chunk metadata migration
@@ -124,6 +126,37 @@ documents, and embeddings. Re-running it updates zero already tagged records. No
 Ollama, or re-embedding is required. Avoid concurrent ingestion while paging the collection.
 This migration does not repair an incompatible embedding scheme or distance; that still
 requires rebuilding the collection. It must run before introducing source-type search filters.
+
+### EPUB book ingestion
+
+`IngestBooksCommand` is separate from feed ingestion. Its `BookLibraryReader` lists EPUB/PDF
+files recursively in `apps/api/books/` (gitignored), or a CLI path/`BOOKS_DIR` override. Hidden
+files and symlinks are ignored. The first-level subfolder is the category. Other extensions
+are reported as unsupported. PDF parsing is not enabled yet and is reported as unsupported.
+
+The EPUB adapter reads `container.xml`, OPF metadata and spine order, and EPUB 3 navigation
+or EPUB 2 NCX titles. It extracts XHTML text via jsdom, without executing scripts or fetching
+resources, and skips navigation, non-linear and textless sections. Missing archive entries
+and corrupt XML/ZIP files are isolated as unreadable book issues.
+
+Each book's bytes yield a SHA-256 `bookId`; renaming a file preserves its identity. Each
+section is chunked independently with the existing 350-word/40-overlap chunker. Metadata is
+`sourceType: 'book'`, `sourceId: bookId#sectionIndex`, `bookId`, `bookTitle`, `authors`,
+`format`, optional `category`, `sectionTitle`, `sectionIndex`, optional `pageStart`/`pageEnd`,
+`chunkIndex`, and `filePath`. Chroma stores authors as a JSON string and omits absent optional
+values. The domain retains authors as `string[]`. IDs are `sha256(bookId#sectionIndex#chunkIndex)`.
+Local paths remain infrastructure metadata and are not returned in graph sources.
+
+Ollama embeds raw chunks in ordered batches of at most `OLLAMA_EMBED_BATCH_SIZE` (32). Books
+are upserted individually with the existing Chroma batching. `BookIngested` is published only
+after persistence; failures emit `BookIngestionFailed` and processing continues. Each run
+ends with `BooksIngestionCompleted`; progress uses the separate reporter port. Duplicate
+content is skipped only after a successful upsert within the same run. Empty, unsupported,
+duplicate and unreadable issues are summarised by the CLI. Runs currently re-ingest all
+books; `--full` is accepted for compatibility with the planned incremental registry.
+
+`/ask` can retrieve both source types from the same collection using the existing Top-K
+ranking. Source quotas and deterministic missing-source nodes are introduced in later phases.
 
 ## Benefits
 

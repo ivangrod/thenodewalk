@@ -21,6 +21,10 @@ keeps responsibilities separated:
 7. A node without a post (`source: null`) is a `<button type="button">` that selects the
    concept on click and focus. It is never rendered as a link, and its accessible name is
    `"{label}, no linked source"`.
+   A book source (`kind: 'book'`) also renders as a selectable button, with a visible `Book`
+   badge and accessible name `"{label}, from the book {bookTitle}, {sectionTitle}"`.
+   Absent sections are omitted; a known page is appended as `", page {pageStart}"`.
+   Book nodes support click/focus selection and expose metadata without linking local files.
 8. The central node (`graph.centralNodeId`) holds the main idea of the graph. The canvas places
    it in the middle and the remaining concepts on a circle around it. It is emphasized with a
    visible `Main idea` text (never by colour alone) and its accessible name includes it:

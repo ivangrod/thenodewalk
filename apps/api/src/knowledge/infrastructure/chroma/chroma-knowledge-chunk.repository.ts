@@ -87,6 +87,9 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
   }
 
   private toMetadata(metadata: KnowledgeChunkMetadata): Metadata {
+    if (metadata.sourceType === 'book') {
+      return { ...metadata, authors: JSON.stringify(metadata.authors) };
+    }
     return {
       sourceType: metadata.sourceType,
       sourceId: metadata.sourceId,
@@ -99,6 +102,27 @@ export class ChromaKnowledgeChunkRepository implements KnowledgeChunkRepository 
   }
 
   private fromMetadata(metadata: Metadata): KnowledgeChunkMetadata {
+    if (metadata.sourceType === 'book') {
+      const authors: unknown = JSON.parse(String(metadata.authors ?? '[]'));
+      if (!Array.isArray(authors) || !authors.every((author) => typeof author === 'string')) {
+        throw new Error('Invalid book authors metadata');
+      }
+      return {
+        sourceType: 'book',
+        sourceId: String(metadata.sourceId),
+        bookId: String(metadata.bookId),
+        bookTitle: String(metadata.bookTitle),
+        authors,
+        format: metadata.format === 'pdf' ? 'pdf' : 'epub',
+        sectionTitle: String(metadata.sectionTitle),
+        sectionIndex: Number(metadata.sectionIndex),
+        chunkIndex: Number(metadata.chunkIndex),
+        filePath: String(metadata.filePath),
+        ...(metadata.category === undefined ? {} : { category: String(metadata.category) }),
+        ...(metadata.pageStart === undefined ? {} : { pageStart: Number(metadata.pageStart) }),
+        ...(metadata.pageEnd === undefined ? {} : { pageEnd: Number(metadata.pageEnd) }),
+      };
+    }
     return {
       sourceType: 'post',
       sourceId: String(metadata.sourceId ?? metadata.articleUrl ?? ''),

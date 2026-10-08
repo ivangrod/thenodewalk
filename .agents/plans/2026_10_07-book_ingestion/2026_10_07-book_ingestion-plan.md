@@ -15,7 +15,7 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T09:23:14Z'
+last_implementation_at: '2026-10-08T09:38:16Z'
 has_completed_all_phases: false
 ---
 
@@ -199,46 +199,46 @@ outline-to-page resolution.
 
 A runnable `ingest:books` CLI indexes EPUB books, and `/ask` can return book nodes that carry a `Book` badge.
 
-- [ ] Application service `IngestBooksCommand`:
+- [x] Application service `IngestBooksCommand`:
   - `execute(booksDir: string, options?: { full?: boolean }): Promise<BookIngestionResult>`
   - `BookIngestionResult { processedBooks: number; indexedChunks: number; skippedBooks: number; issues: BookIngestionIssue[] }`
   - `BookIngestionIssue { filePath: string; type: 'unreadable' | 'empty' | 'duplicate' | 'unsupported'; reason: string }`
-- [ ] Domain ports:
+- [x] Domain ports:
   - `BookLibraryReader.list(booksDir: string): Promise<{ books: BookFile[]; unsupported: string[] }>`, with
     `BookFile { filePath: string; format: 'epub' | 'pdf'; category: string | null }`.
   - `BookContentReader.read(file: BookFile): Promise<BookContent>`, with
     `BookContent { contentHash: string; title: string; authors: string[]; sections: BookSection[] }` and
     `BookSection { index: number; title: string; text: string; pageStart: number | null; pageEnd: number | null }`.
-- [ ] Domain chunk model:
+- [x] Domain chunk model:
   - `BookChunkMetadata { sourceType: 'book'; sourceId; bookId; bookTitle; authors; format; category?; sectionTitle; sectionIndex; pageStart?; pageEnd?; chunkIndex; filePath }`, where `bookId` is the content hash and `sourceId` is `bookId#sectionIndex`.
   - Null values are omitted because ChromaDB metadata does not accept them.
   - `KnowledgeChunkMetadata = PostChunkMetadata | BookChunkMetadata`.
   - Book chunk id: `sha256(bookId#sectionIndex#chunkIndex)`.
-- [ ] Domain events:
+- [x] Domain events:
   - `BookIngested(bookId, title, filePath, chunkCount, occurredAt)`
   - `BookIngestionFailed(filePath, reason, occurredAt)`
   - `BooksIngestionCompleted(processedBooks, indexedChunks, occurredAt)`
-- [ ] Progress reporter port `BookIngestionProgressReporter` with `bookStarted(progress)`,
+- [x] Progress reporter port `BookIngestionProgressReporter` with `bookStarted(progress)`,
       `bookCompleted(progress, { sections, chunks })` and `bookFailed(progress, reason)`, where
       `progress = { position; total; filePath }`. Add a logger adapter.
-- [ ] Infrastructure adapters:
+- [x] Infrastructure adapters:
   - `FsBookLibraryReader`: recursive scan; the first-level folder becomes the category.
   - `EpubBookContentReader`: `META-INF/container.xml`, then OPF (title, authors, spine), then nav or NCX for section
     titles, then text extraction with `jsdom`.
   - `CompositeBookContentReader`: dispatches by format. PDF files are reported as `unsupported` until Phase 4.
-- [ ] Embedding batching in `OllamaEmbeddingGenerator` (`OLLAMA_EMBED_BATCH_SIZE = 32`). Chunks are upserted per book.
-- [ ] CLI `apps/api/src/knowledge/infrastructure/cli/ingest-books.ts` and script `"ingest:books"`:
+- [x] Embedding batching in `OllamaEmbeddingGenerator` (`OLLAMA_EMBED_BATCH_SIZE = 32`). Chunks are upserted per book.
+- [x] CLI `apps/api/src/knowledge/infrastructure/cli/ingest-books.ts` and script `"ingest:books"`:
       `pnpm --filter @thenodewalk/api ingest:books [--full] [path/to/books]`. The default directory is `apps/api/books/`
       unless `BOOKS_DIR` is set. Add `apps/api/books/` to `.gitignore`.
-- [ ] Structured graph prompt `v5`: retrieved sources become opaque labels `S1..Sn`. Books are described by title and
+- [x] Structured graph prompt `v5`: retrieved sources become opaque labels `S1..Sn`. Books are described by title and
       section and posts by title and blog. The LLM returns a source label per node, and the generator maps it back to
       the `sourceId`. Unknown labels become `null`.
-- [ ] Shared contract: add
+- [x] Shared contract: add
       `{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null }` to
       `KnowledgeNodeSource`.
-- [ ] Web `ConceptNode`: a book node renders as a `button` with a visible `Book` badge. Its accessible name is
+- [x] Web `ConceptNode`: a book node renders as a `button` with a visible `Book` badge. Its accessible name is
       `{label}, from the book {bookTitle}, {sectionTitle}`.
-- [ ] Test suites:
+- [x] Test suites:
   - `ingest-books.command.spec.ts` (new):
     - indexes every EPUB section as book chunks.
     - stores the first-level folder as category.
@@ -269,13 +269,21 @@ A runnable `ingest:books` CLI indexes EPUB books, and `/ask` can return book nod
   - `answer-technical-query.query.spec.ts`: maps a book match to a book source.
   - `KnowledgeGraphCanvas.test.tsx`: renders a book node as a button with a `Book` badge and its accessible name.
   - `e2e/technical-query.spec.ts`: shows book and post nodes with their badges (axe included).
-- [ ] UI copy: `Book`, `from the book {bookTitle}, {sectionTitle}`.
-- [ ] Update `docs/rag/local-pipeline.md` and `docs/rag/operations-and-verification.md` with the book ingestion
+- [x] UI copy: `Book`, `from the book {bookTitle}, {sectionTitle}`.
+- [x] Update `docs/rag/local-pipeline.md` and `docs/rag/operations-and-verification.md` with the book ingestion
       section.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Verification: all five required commands passed (137 API tests and 13 web tests), as did
+`pnpm test:e2e` (4 Playwright tests including mixed book/post badges and axe, 1 Cypress test).
+The integration test wires real filesystem and EPUB adapters through Nest, indexes the
+synthetic EPUB with stubbed embeddings, then resolves a book source through the query.
+EPUB 2 NCX and EPUB 3 navigation, empty sections, duplicates, failed persistence retries,
+book metadata round-tripping and ordered embedding batches are covered. Chroma authors
+are JSON-encoded at the adapter boundary; optional metadata fields are omitted.
 
 ### Phase 4: PDF ingestion with text cleanup
 
@@ -399,6 +407,6 @@ remaining nodes without a source.
 
 ## ⏭️ Next step
 
-Review Phase 2, then implement Phase 3 (EPUB ingestion and book nodes) when explicitly requested.
+Review Phase 3, then implement Phase 4 (PDF ingestion with text cleanup) when explicitly requested.
 
-With badges 🏷️ and sample books 📚 ready, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) can walk into EPUB ingestion.
+With badges 🏷️ and books 📚 on the graph 🕸️, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward PDF chapters.

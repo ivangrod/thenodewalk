@@ -9,6 +9,16 @@ import { PrismaFeedLastPublicationDateRepository } from './persistence/prisma-fe
 import { SharedModule } from '../../shared/infrastructure/shared.module';
 import { AnswerTechnicalQueryQuery } from '../application/answer-technical-query.query';
 import { IngestFeedsCommand } from '../application/ingest-feeds.command';
+import { IngestBooksCommand } from '../application/ingest-books.command';
+import {
+  BOOK_CONTENT_READER,
+  BOOK_LIBRARY_READER,
+  BOOK_INGESTION_PROGRESS_REPORTER,
+} from '../application/knowledge.tokens';
+import { FsBookLibraryReader } from './books/fs-book-library.reader';
+import { EpubBookContentReader } from './books/epub-book-content.reader';
+import { CompositeBookContentReader } from './books/composite-book-content.reader';
+import { LoggerBookIngestionProgressReporter } from './logging/logger-book-ingestion-progress-reporter';
 import {
   ARTICLE_FEED_READER,
   EMBEDDING_GENERATOR,
@@ -61,6 +71,14 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
   controllers: [TechnicalQueryController],
   providers: [
     IngestFeedsCommand,
+    IngestBooksCommand,
+    { provide: BOOK_LIBRARY_READER, useClass: FsBookLibraryReader },
+    {
+      provide: BOOK_CONTENT_READER,
+      useFactory: (): CompositeBookContentReader =>
+        new CompositeBookContentReader(new EpubBookContentReader()),
+    },
+    { provide: BOOK_INGESTION_PROGRESS_REPORTER, useClass: LoggerBookIngestionProgressReporter },
     SaveLastPublicationDateCommand,
     SaveLastPublicationDateOnKnowledgeFeedIngested,
     {
@@ -116,7 +134,7 @@ const DEFAULT_LLM_MODEL = 'llama3.1:8b';
       useFactory: (): IngestionProgressReporter => createLoggerIngestionProgressReporter(),
     },
   ],
-  exports: [IngestFeedsCommand, AnswerTechnicalQueryQuery],
+  exports: [IngestFeedsCommand, IngestBooksCommand, AnswerTechnicalQueryQuery],
 })
 export class KnowledgeModule implements OnModuleInit {
   constructor(

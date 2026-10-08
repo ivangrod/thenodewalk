@@ -40,7 +40,11 @@ export function ConceptNode({ id, data }: NodeProps<ConceptFlowNode>): ReactElem
     .filter(Boolean)
     .join(' ');
   const selectConcept = (): void => select(id);
-  const accessibleLabel = data.isCentral ? `${data.label}, main idea` : data.label;
+  const sourceLabel =
+    data.source?.kind === 'book'
+      ? `${data.label}, from the book ${data.source.bookTitle}${data.source.sectionTitle ? `, ${data.source.sectionTitle}` : ''}${data.source.pageStart === null ? '' : `, page ${data.source.pageStart}`}`
+      : data.label;
+  const accessibleLabel = data.isCentral ? `${sourceLabel}, main idea` : sourceLabel;
   const content = (
     <>
       {data.isCentral ? (
@@ -49,16 +53,22 @@ export function ConceptNode({ id, data }: NodeProps<ConceptFlowNode>): ReactElem
         </span>
       ) : null}
       {data.label}
-      {data.source === null ? null : <span className="mt-1 block text-xs font-semibold">Post</span>}
+      {data.source === null ? null : (
+        <span className="mt-1 block text-xs font-semibold">
+          {data.source.kind === 'book' ? 'Book' : 'Post'}
+        </span>
+      )}
     </>
   );
 
   return (
     <div className="rounded-xl">
       <Handle type="target" position={Position.Left} className="!bg-primary" />
-      {data.source === null ? (
+      {data.source?.kind !== 'post' ? (
         <button
-          aria-label={`${accessibleLabel}, no linked source`}
+          aria-label={
+            data.source === null ? `${accessibleLabel}, no linked source` : accessibleLabel
+          }
           className={className}
           onClick={selectConcept}
           onFocus={selectConcept}

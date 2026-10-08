@@ -7,6 +7,7 @@ import {
   type OllamaChatClient,
 } from './ollama-structured-graph-generator';
 import { KnowledgeChunkMother } from '../../domain/testing/knowledge.mother';
+import { BookChunkMother } from '../../domain/testing/book.mother';
 import type { KnowledgeSearchMatch } from '../../domain/knowledge-chunk-repository';
 
 class FakeOllamaChatClient implements OllamaChatClient {
@@ -30,8 +31,8 @@ const VALID_JSON = JSON.stringify({
   summary: 'Kafka decouples producers from consumers.',
   graph: {
     nodes: [
-      { id: 'kafka', label: 'Apache Kafka', type: 'concept', sourceUrl: 'https://blog.test/kafka' },
-      { id: 'broker', label: 'Broker', type: 'concept', sourceUrl: 'https://blog.test/kafka' },
+      { id: 'kafka', label: 'Apache Kafka', type: 'concept', source: 'S1' },
+      { id: 'broker', label: 'Broker', type: 'concept', source: 'S1' },
     ],
     edges: [{ source: 'kafka', target: 'broker', relationship: 'contains' }],
     centralNodeId: 'kafka',
@@ -39,7 +40,36 @@ const VALID_JSON = JSON.stringify({
 });
 
 describe('OllamaStructuredGraphGenerator', () => {
-  it('requests JSON output and maps sourceUrl into the domain sourceId', async () => {
+  it('describes book and post sources with opaque labels and clears unknown labels', async () => {
+    const client = new FakeOllamaChatClient(
+      JSON.stringify({
+        summary: 'Answer',
+        graph: {
+          nodes: [
+            { id: 'book', label: 'Feedback', source: 'S1' },
+            { id: 'unknown', label: 'Unknown', source: 'S99' },
+          ],
+          edges: [],
+          centralNodeId: 'book',
+        },
+      }),
+    );
+    const book = BookChunkMother.create();
+    const post = KnowledgeChunkMother.create({ articleTitle: 'Post title', blogName: 'Blog' });
+    const result = await new OllamaStructuredGraphGenerator(client, 'model').generate('Question', [
+      { chunk: book, score: 1 },
+      { chunk: post, score: 0.9 },
+    ]);
+    expect(client.lastRequest?.messages[1]?.content).toContain(
+      'S1 (Book: Engineering Feedback; section: Feedback)',
+    );
+    expect(client.lastRequest?.messages[1]?.content).toContain('S2 (Post: Post title; blog: Blog)');
+    expect(result.graph.nodes.map(({ sourceId }) => sourceId)).toEqual([
+      book.metadata.sourceId,
+      null,
+    ]);
+  });
+  it('requests JSON output and maps source labels into domain identities', async () => {
     const client = new FakeOllamaChatClient(VALID_JSON);
     const generator = new OllamaStructuredGraphGenerator(client, 'llama3.1:8b');
 
@@ -109,8 +139,8 @@ describe('parseGeneratedGraph', () => {
       summary: 'partial',
       graph: {
         nodes: [
-          { id: 'a', label: 'A', type: 'concept', sourceUrl: 'https://blog.test/a' },
-          { id: 'b', sourceUrl: 'https://blog.test/b' }, // malformed: no label
+          { id: 'a', label: 'A', type: 'concept', source: 'S1' },
+          { id: 'b', source: 'S2' }, // malformed: no label
         ],
         edges: [
           { source: 'a', target: 'a', relationship: 'self' },
@@ -132,9 +162,9 @@ describe('parseGeneratedGraph', () => {
       summary: 'mixed',
       graph: {
         nodes: [
-          { id: 'linked', label: 'Linked', type: 'concept', sourceUrl: 'https://blog.test/a' },
-          { id: 'null', label: 'Null', type: 'concept', sourceUrl: null },
-          { id: 'empty', label: 'Empty', type: 'concept', sourceUrl: '' },
+          { id: 'linked', label: 'Linked', type: 'concept', source: 'S1' },
+          { id: 'null', label: 'Null', type: 'concept', source: null },
+          { id: 'empty', label: 'Empty', type: 'concept', source: '' },
           { id: 'missing', label: 'Missing', type: 'concept' },
         ],
         edges: [{ source: 'linked', target: 'missing', relationship: 'relates to' }],
@@ -144,7 +174,7 @@ describe('parseGeneratedGraph', () => {
     const result = parseGeneratedGraph(raw);
 
     expect(result.graph.nodes.map((node) => [node.id, node.sourceId])).toEqual([
-      ['linked', 'https://blog.test/a'],
+      ['linked', 'S1'],
       ['null', null],
       ['empty', null],
       ['missing', null],
@@ -156,7 +186,7 @@ describe('parseGeneratedGraph', () => {
     const raw = JSON.stringify({
       summary: 's',
       graph: {
-        nodes: [{ id: 'a', label: 'A', type: 'something-else', sourceUrl: 'https://blog.test/a' }],
+        nodes: [{ id: 'a', label: 'A', type: 'something-else', source: 'S1' }],
         edges: [],
       },
     });
@@ -172,7 +202,7 @@ describe('parseGeneratedGraph', () => {
     const raw = JSON.stringify({
       summary: 's',
       graph: {
-        nodes: [{ id: 'a', label: 'A', type: 'concept', sourceUrl: 'https://blog.test/a' }],
+        nodes: [{ id: 'a', label: 'A', type: 'concept', source: 'S1' }],
         edges: [],
       },
     });

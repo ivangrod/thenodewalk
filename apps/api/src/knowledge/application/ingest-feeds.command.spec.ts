@@ -183,7 +183,7 @@ describe('IngestFeedsCommand', () => {
       defaultText: 'undated content',
     });
     await scenario.command.execute(OPML_PATH);
-    expect(scenario.repository.lastUpsert[0]?.metadata.publishedAt).toBe('');
+    expect(scenario.repository.lastUpsert[0]?.metadata).toMatchObject({ publishedAt: '' });
     expect(scenario.eventBus.ofType('knowledge.feed.ingested')).toEqual([]);
   });
 
@@ -232,8 +232,10 @@ describe('IngestFeedsCommand', () => {
     expect(result.processedFeeds).toBe(1);
     expect(result.processedArticles).toBe(1);
     expect(result.indexedChunks).toBe(1);
-    expect(repository.lastUpsert[0]?.metadata.blogName).toBe(subscription.blogName);
-    expect(repository.lastUpsert[0]?.metadata.articleUrl).toBe(article.url);
+    expect(repository.lastUpsert[0]?.metadata).toMatchObject({
+      blogName: subscription.blogName,
+      articleUrl: article.url,
+    });
   });
 
   it('indexes the readable text of the article as the chunk document', async () => {
@@ -583,7 +585,9 @@ describe('IngestFeedsCommand', () => {
     const result = await command.execute(OPML_PATH);
 
     expect(result.processedFeeds).toBe(1);
-    expect(repository.lastUpsert.map((chunk) => chunk.metadata.blogName)).toEqual(['Facebook']);
+    expect(repository.lastUpsert.map((chunk) => chunk.metadata)).toEqual([
+      expect.objectContaining({ blogName: 'Facebook' }),
+    ]);
     expect(progress.reports.filter((report) => report.status === 'in progress')).toHaveLength(1);
     expect(result.issues).toEqual([
       {
@@ -652,7 +656,8 @@ describe('IngestFeedsCommand', () => {
     expect(result.issues.map((issue) => [issue.feedUrl, issue.type])).toEqual([
       [failing.feedUrl, 'inaccessible'],
     ]);
-    expect(repository.lastUpsert.map((chunk) => chunk.metadata.articleUrl)).toEqual([shared.url]);
-    expect(repository.lastUpsert[0]?.metadata.blogName).toBe(healthy.blogName);
+    expect(repository.lastUpsert.map((chunk) => chunk.metadata)).toEqual([
+      expect.objectContaining({ articleUrl: shared.url, blogName: healthy.blogName }),
+    ]);
   });
 });

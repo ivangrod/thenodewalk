@@ -66,6 +66,37 @@ function positionOf(nodeId: string): { x: number; y: number } {
 }
 
 describe('KnowledgeGraphCanvas', () => {
+  it('renders a book as a selectable button with badge and source-aware accessible name', () => {
+    render(
+      <KnowledgeGraphCanvas
+        graph={{
+          nodes: [
+            {
+              id: 'book',
+              label: 'Feedback',
+              type: 'concept',
+              source: {
+                kind: 'book',
+                bookTitle: 'Engineering Feedback',
+                sectionTitle: 'Small loops',
+                pageStart: null,
+              },
+            },
+          ],
+          edges: [],
+          centralNodeId: null,
+        }}
+      />,
+    );
+    const button = screen.getByRole('button', {
+      name: 'Feedback, from the book Engineering Feedback, Small loops',
+    });
+    expect(button).toHaveTextContent('Book');
+    expect(button).not.toHaveAttribute('href');
+    act(() => button.focus());
+    expect(button).toHaveFocus();
+    expect(useSelectedConceptStore.getState().selectedNodeId).toBe('book');
+  });
   it('renders every concept as an accessible link to its source that opens in a new tab', () => {
     render(<KnowledgeGraphCanvas graph={GRAPH} />);
 

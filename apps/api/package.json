@@ -7,6 +7,7 @@
     "dev": "nest start --watch",
     "start": "node dist/main",
     "ingest": "ts-node src/knowledge/infrastructure/cli/ingest.ts",
+    "ingest:books": "ts-node src/knowledge/infrastructure/cli/ingest-books.ts",
     "chroma:migrate": "ts-node src/knowledge/infrastructure/cli/chroma-migrate.ts",
     "books:verify": "ts-node src/knowledge/infrastructure/cli/verify-book-parsing.ts",
     "lint": "eslint .",

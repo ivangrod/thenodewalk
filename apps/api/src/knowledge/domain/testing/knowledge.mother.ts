@@ -16,7 +16,7 @@ export class FeedLastPublicationDateMother {
 import {
   createKnowledgeChunk,
   type KnowledgeChunk,
-  type KnowledgeChunkMetadata,
+  type PostChunkMetadata,
 } from '../knowledge-chunk';
 import type { KnowledgeGraphEdge, KnowledgeGraphNode } from '../knowledge-graph';
 
@@ -42,7 +42,7 @@ export class FeedArticleMother {
 }
 
 export class KnowledgeChunkMetadataMother {
-  static create(params?: Partial<KnowledgeChunkMetadata>): KnowledgeChunkMetadata {
+  static create(params?: Partial<PostChunkMetadata>): PostChunkMetadata {
     const articleUrl = params?.articleUrl ?? faker.internet.url();
     return {
       sourceType: 'post',
@@ -59,7 +59,7 @@ export class KnowledgeChunkMetadataMother {
 
 export class KnowledgeChunkMother {
   static create(
-    params?: Partial<{ document: string; embedding: number[] } & KnowledgeChunkMetadata>,
+    params?: Partial<{ document: string; embedding: number[] } & PostChunkMetadata>,
   ): KnowledgeChunk {
     const { document, embedding, ...metadata } = params ?? {};
     return createKnowledgeChunk({

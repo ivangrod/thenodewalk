@@ -19,7 +19,7 @@ export class InvalidStructuredGraphError extends Error {
 }
 
 /** Versioned system prompt. Bump the version when the contract or rules change. */
-export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v4';
+export const STRUCTURED_GRAPH_SYSTEM_PROMPT_VERSION = 'v5';
 
 export const STRUCTURED_GRAPH_SYSTEM_PROMPT = `You are a senior software architect. Using ONLY the provided sources, answer the question as an interactive knowledge graph.
 Respond with a single JSON object and nothing else, matching exactly this schema:
@@ -27,7 +27,7 @@ Respond with a single JSON object and nothing else, matching exactly this schema
   "summary": string,               // concise natural-language answer
   "graph": {
     "nodes": [                     // key concepts
-      { "id": string, "label": string, "type": "concept", "sourceUrl": string | null }
+      { "id": string, "label": string, "type": "concept", "source": string | null }
     ],
     "edges": [                     // semantic relationships between node ids
       { "source": string, "target": string, "relationship": string }
@@ -36,11 +36,11 @@ Respond with a single JSON object and nothing else, matching exactly this schema
   }
 }
 Rules:
-- A node "sourceUrl" MUST be one of the provided source URLs, or null.
-- Use null as "sourceUrl" when no provided source supports the concept.
-- Each source URL can be linked to at most one node; use null as "sourceUrl" for the other nodes supported by the same source.
+- A node "source" MUST be one of the provided source labels (S1, S2, ...), or null.
+- Use null as "source" when no provided source supports the concept.
+- Each source can be linked to at most one node; use null for other nodes supported by the same source.
 - Every edge "source" and "target" MUST reference an existing node "id".
-- "centralNodeId" MUST be the id of the node holding the main idea of the most relevant source (Source 1).
+- "centralNodeId" MUST be the id of the node holding the main idea of the most relevant source (S1).
 - Every node MUST be reachable from the central node through at most ${MAX_GRAPH_DEPTH} edges.
 - "type" is always the literal "concept".
 - Do not invent facts that are not supported by the sources.
@@ -104,15 +104,32 @@ export class OllamaStructuredGraphGenerator implements StructuredGraphGenerator 
       ],
     });
 
-    return parseGeneratedGraph(response.message.content);
+    const parsed = parseGeneratedGraph(response.message.content);
+    const sourceIds = new Map(
+      context.map((match, index) => [`S${index + 1}`, match.chunk.metadata.sourceId]),
+    );
+    return {
+      ...parsed,
+      graph: {
+        ...parsed.graph,
+        nodes: parsed.graph.nodes.map((node) => ({
+          ...node,
+          sourceId: node.sourceId === null ? null : (sourceIds.get(node.sourceId) ?? null),
+        })),
+      },
+    };
   }
 
   private buildUserPrompt(query: string, context: KnowledgeSearchMatch[]): string {
     const sources = context
-      .map(
-        (match, index) =>
-          `Source ${index + 1} (sourceUrl: ${match.chunk.metadata.articleUrl}):\n${match.chunk.document}`,
-      )
+      .map((match, index) => {
+        const metadata = match.chunk.metadata;
+        const description =
+          metadata.sourceType === 'post'
+            ? `Post: ${metadata.articleTitle}; blog: ${metadata.blogName}`
+            : `Book: ${metadata.bookTitle}; section: ${metadata.sectionTitle}`;
+        return `S${index + 1} (${description}):\n${match.chunk.document}`;
+      })
       .join('\n\n');
 
     return `Question: ${query}\n\nSources:\n${sources}`;
@@ -180,7 +197,7 @@ function normalizeNode(value: Record<string, unknown>): KnowledgeGraphNode {
     label: value.label as string,
     type: 'concept',
     // A missing, empty or non-string source means the concept has no linked post.
-    sourceId: nonBlankStringOrNull(value.sourceUrl),
+    sourceId: nonBlankStringOrNull(value.source),
   };
 }
 

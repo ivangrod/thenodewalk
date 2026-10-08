@@ -16,8 +16,22 @@ const RESPONSE: TechnicalQueryResponse = {
         source: { kind: 'post', url: SOURCE_URL },
       },
       { id: 'services', label: 'Microservices', type: 'concept', source: null },
+      {
+        id: 'book',
+        label: 'Feedback loops',
+        type: 'concept',
+        source: {
+          kind: 'book',
+          bookTitle: 'Engineering Feedback',
+          sectionTitle: 'Small loops',
+          pageStart: null,
+        },
+      },
     ],
-    edges: [{ source: 'gateway', target: 'services', relationship: 'routes to' }],
+    edges: [
+      { source: 'gateway', target: 'services', relationship: 'routes to' },
+      { source: 'gateway', target: 'book', relationship: 'improves with' },
+    ],
     centralNodeId: 'gateway',
   },
 };
@@ -65,6 +79,11 @@ test.describe('technical query flow', () => {
     await expect(nodeLink).toHaveAttribute('href', SOURCE_URL);
     await expect(nodeLink).toContainText('Main idea');
     await expect(nodeLink).toContainText('Post');
+    const bookNode = page.getByRole('button', {
+      name: 'Feedback loops, from the book Engineering Feedback, Small loops',
+    });
+    await expect(bookNode).toBeVisible();
+    await expect(bookNode).toContainText('Book');
 
     const popup = await Promise.all([page.waitForEvent('popup'), nodeLink.click()]).then(
       ([openedPopup]) => openedPopup,
