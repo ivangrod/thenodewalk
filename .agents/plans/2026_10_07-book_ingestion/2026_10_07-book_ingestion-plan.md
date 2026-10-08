@@ -15,7 +15,7 @@ implemented_by:
     name: 'OpenAI GPT'
     version: '6.1-sol'
     reasoning_effort: 'unspecified'
-last_implementation_at: '2026-10-08T06:50:49Z'
+last_implementation_at: '2026-10-08T09:23:14Z'
 has_completed_all_phases: false
 ---
 
@@ -158,25 +158,42 @@ badge.
 
 Verification: all five required commands passed, as did `pnpm test:e2e` (119 API tests,
 12 web tests, 4 Playwright tests including axe checks, and 1 Cypress test). The migration
-is implemented and unit-tested; it has not been run against the local knowledge collection.
+was subsequently run against the local knowledge collection: 49,644 post chunks migrated
+(metadata only).
 
 ### Phase 2: Book parsing dependencies (spike)
 
 Add the EPUB and PDF parsing libraries and prove that they load under `nest build` (CommonJS), `ts-node` and Jest.
 
-- [ ] EPUB: add a zip library (candidate `jszip`) and reuse the existing `jsdom` dependency for XHTML.
-- [ ] PDF: evaluate `unpdf`, `pdfjs-dist` and `pdf-parse` for per-page text extraction, outline support and ESM/CJS
+- [x] EPUB: add a zip library (candidate `jszip`) and reuse the existing `jsdom` dependency for XHTML.
+- [x] PDF: evaluate `unpdf`, `pdfjs-dist` and `pdf-parse` for per-page text extraction, outline support and ESM/CJS
       compatibility (`require(esm)` on Node 22.17). Pin the chosen version exactly.
-- [ ] Add generated, license-free fixtures `apps/api/test/fixtures/books/sample.epub` and
+- [x] Add generated, license-free fixtures `apps/api/test/fixtures/books/sample.epub` and
       `apps/api/test/fixtures/books/sample.pdf`.
-- [ ] Test suites:
+- [x] Test suites:
   - `book-parsing-libraries.spec.ts` (new, later replaced by the adapter specs):
     - opens the EPUB fixture archive.
     - reads the PDF fixture page text.
-- [ ] Verify the changes in terms of typechecking, linting and tests using the project's verification command
+- [x] Verify the changes in terms of typechecking, linting and tests using the project's verification command
       (`pnpm format:check`, `pnpm lint`, `pnpm lint:architecture`, `pnpm typecheck`, `pnpm test`). Fix issues if any.
-- [ ] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
+- [x] STOP. Present the changes to the user for review and suggest commit messages. Do NOT proceed to the next phase
       until the user explicitly asks.
+
+Decision: pin `jszip@3.10.2` and `unpdf@1.8.1`. The existing `jsdom` parses XHTML.
+`unpdf` ships bundled serverless PDF.js and exposes per-page text, metadata, outlines and
+`getPageIndex` for chapter destinations. `pdfjs-dist@6.4.299` was assessed via package metadata
+(ESM entrypoint); `pdf-parse@2.4.5` was installed and trialled, then removed: it also needs
+Jest VM-module support, adds native canvas and lacks a public document proxy to resolve
+outline destinations. Both PDF candidates failed in standard Jest due to dynamic imports.
+API test and coverage scripts now use `--experimental-vm-modules`; production remains
+CommonJS and needs no extra flags. This is the compatibility adjustment discovered by the spike.
+
+Verification: all five required commands passed (121 API tests, 12 web tests).
+`pnpm --filter @thenodewalk/api books:verify` passed under ts-node, `nest build` passed,
+and the compiled CommonJS CLI passed under Node 22.17.1. The synthetic EPUB and two-page PDF
+include original CC0 content, with a reproducible TypeScript generator and a fixture README
+documenting the decision and commands. The PDF test checks text by page, metadata and
+outline-to-page resolution.
 
 ### Phase 3: EPUB ingestion end to end and book nodes in `/ask`
 
@@ -382,6 +399,6 @@ remaining nodes without a source.
 
 ## ⏭️ Next step
 
-Review Phase 1, then implement Phase 2 (book parsing dependencies spike) when explicitly requested.
+Review Phase 2, then implement Phase 3 (EPUB ingestion and book nodes) when explicitly requested.
 
-Post sources now wear their badges 🏷️ as 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) walks toward books.
+With badges 🏷️ and sample books 📚 ready, 🐢 💨 (Turbotuga™, [Codely](https://codely.com)'s mascot) can walk into EPUB ingestion.
