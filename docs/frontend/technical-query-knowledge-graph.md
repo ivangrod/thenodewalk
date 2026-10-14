@@ -14,29 +14,40 @@ Zustand holds only the selected concept id. Modal state is local to the canvas.
    Style the workspace like the library's PersonCard demo: dark dotted canvas, compact
    cards with coloured initial badges and a secondary label. Share the scoped dark
    palette with the article modal.
-   Pin only the main idea at the centre. Configure repulsion, link, collision and
-   centring forces; compute the initial layout with stopped synchronous ticks to avoid
-   animated motion on load. Nodes can be dragged, after which the simulation settles
-   rather than moving perpetually. Pointer pan/zoom and keyboard-operable zoom/reset
-   controls remain available.
+   Place the main idea at the centre and order the other nodes around it to minimise
+   straight-edge crossings, then edges through other cards, then total edge length.
+   Search all ring orders up to seven peripheral nodes, otherwise use bounded pair
+   swaps (at most 6000 candidate layouts). Non-planar graphs may still have crossings.
+   Pin every initial node with `fx/fy`; no force layout moves the graph afterward.
+   Pointer dragging updates the selected node's fixed coordinates using the SVG screen
+   transform, so zoom/pan are respected and the node stays where it is released. Other
+   nodes remain fixed. A drag does not activate a source dialog. Pointer pan/zoom and
+   keyboard-operable zoom/reset controls remain available. Reset view resets zoom only.
 3. Nodes are semantic buttons. Focus selects a concept. `node.source` is a discriminated
-   union: clicking or pressing Enter/Space opens article details only for post sources
-   (`kind: 'post'`), whose accessible name is `"{label}, view article details"`. Nodes
-   without a source (`source: null`) are named `"{label}, no linked source"`.
+   union: clicking or pressing Enter/Space on a sourced node opens its details dialog
+   (`aria-haspopup="dialog"`). Post nodes are named `"{label}, view article details"`.
+   Nodes without a source (`source: null`) open nothing and are named
+   `"{label}, no linked source"`.
 4. Sourced nodes show a visible `Post` or `Book` text badge; unsourced nodes have none.
    The main idea has a visible `Main idea` text label and its accessible name includes
    `, main idea`. Source type and availability are never conveyed by colour alone.
-5. A book section (`kind: 'book'`) is a selectable button without a modal or link, so
-   local files are never exposed. Its accessible name is
-   `"{label}, from the book {bookTitle}, {sectionTitle}, page {pageStart}"`; an unknown
-   section or page is omitted, and `, main idea` is appended for the central node.
-6. Render one Radix modal outside the SVG, using the same Tailwind card, primary, border
-   and foreground tokens as the graph. Include article title, origin, publication date,
-   close control and a real `Go to…` anchor with `target="_blank"` and
-   `rel="noopener noreferrer"`. Allow only HTTP (S) navigation.
-7. The modal traps focus, closes on Escape and restores focus to its triggering node.
-   Replacing the graph closes stale article details. Unknown metadata (`null`) has
-   explicit unavailable labels.
+5. A book section (`kind: 'book'`) is named
+   `"{label}, from the book {bookTitle}, {sectionTitle}, page {pageStart}, view book excerpt"`;
+   an unknown section or page is omitted, and `, main idea` precedes the action for the
+   central node. It shows a visible `View excerpt` hint and opens the book dialog. Book
+   dialogs never link to local files.
+6. Render the source dialogs outside the SVG through the shared `SourceDialog` frame, using
+   the same Tailwind card, primary, border and foreground tokens as the graph.
+   - Article dialog: article title, origin, publication date, close control and a real
+     `Go to…` anchor with `target="_blank"` and `rel="noopener noreferrer"`. Allow only
+     HTTP (S) navigation.
+   - Book dialog: the book title as the dialog title, the section, the page where the
+     section starts (only when known), and the `Matching excerpt` as a `blockquote`. The
+     excerpt is the API's verbatim passage of the retrieved section; never generate or
+     reword it on the client.
+7. Dialogs trap focus, close on Escape and restore focus to their triggering node.
+   Replacing the graph closes stale details. Unknown metadata (`null`) has explicit
+   unavailable labels.
 8. Use `node.source` from the API for provenance. Never infer the title from the concept
    label, the origin from the URL, or the publication date from the current time.
 9. Show directed relationships and their labels in the graph; do not add a separate
@@ -99,6 +110,7 @@ const bookNode = {
     bookTitle: 'Engineering Feedback',
     sectionTitle: 'Small loops',
     pageStart: 12,
+    excerpt: 'Small feedback loops make engineering changes easier to review.',
   },
 };
 ```
@@ -119,6 +131,14 @@ const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
 // Do not display `new Date()` as the article's publication date.
 ```
 
+### ❌ Bad: Client-side or generated book excerpts
+
+```tsx
+// The excerpt must come verbatim from the API's retrieved section, never the LLM summary
+// or a client-side guess.
+<blockquote>{summary.slice(0, 200)}</blockquote>
+```
+
 ### ❌ Bad: Source type conveyed only by colour, or a book linking a local file
 
 ```tsx
@@ -132,7 +152,9 @@ const KnowledgeGraphCanvas = dynamic(() => import('./KnowledgeGraphCanvas'), {
 - D3 adapter, layout, controls and modal state:
   `apps/web/src/features/technical-query/presentation/components/KnowledgeGraphCanvas.tsx`
 - Semantic node: `apps/web/src/features/technical-query/presentation/components/ConceptNode.tsx`
+- Shared dialog frame: `apps/web/src/features/technical-query/presentation/components/SourceDialog.tsx`
 - Article modal: `apps/web/src/features/technical-query/presentation/components/ArticleSourceDialog.tsx`
+- Book modal: `apps/web/src/features/technical-query/presentation/components/BookSourceDialog.tsx`
 - Dependency CSS isolation: `patches/d3-graph-react@1.3.1.patch`
 - Real renderer, keyboard and axe checks: `apps/web/e2e/technical-query.spec.ts`
 

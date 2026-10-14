@@ -147,6 +147,64 @@ embedding model, and compared with the cosine distance. A `knowledge_chunks` col
 with the previous `l2` scheme is rejected with `IncompatibleKnowledgeCollectionError`: delete it
 and run `ingest --full` (see `docs/rag/operations-and-verification.md`).
 
+### Ingest books (EPUB and PDF)
+
+The book ingestion CLI is separate from the blog ingestion process. It recursively reads
+EPUB and PDF files, extracts text by chapter/section, and indexes their chunks into the same
+ChromaDB `knowledge_chunks` collection. It requires PostgreSQL, ChromaDB, and Ollama with
+`nomic-embed-text` running locally; the web app and API HTTP server do not need to be started.
+
+Run these commands from the repository root after configuring `apps/api/.env`:
+
+```sh
+pnpm infra:up
+pnpm --filter @thenodewalk/api prisma:generate
+pnpm --filter @thenodewalk/api prisma:deploy
+mkdir -p apps/api/books/AGILE
+# Place your EPUB/PDF files in apps/api/books/ or its subfolders, then run:
+pnpm --filter @thenodewalk/api ingest:books
+```
+
+`apps/api/books/` is excluded from Git. The first-level subfolder becomes the book's category
+(for example, `AGILE`); files directly in the directory have no category.
+
+Use a different library directory with a CLI argument or `BOOKS_DIR`:
+
+```sh
+pnpm --filter @thenodewalk/api ingest:books "/absolute/path/to/My Books"
+BOOKS_DIR="/absolute/path/to/My Books" pnpm --filter @thenodewalk/api ingest:books
+# Or set BOOKS_DIR in apps/api/.env.
+```
+
+The explicit path takes precedence over `BOOKS_DIR`, then the default `apps/api/books/`.
+Relative paths are resolved from the API workspace (`apps/api`), not the repository root.
+The CLI loads `apps/api/.env`; exported environment variables take precedence.
+
+Normal runs skip book content hashes already recorded in PostgreSQL's `ingested_books`
+table, avoiding repeated embedding and vector writes. Identical files are indexed once per
+run, even under different names. Modified files have a new content hash and are indexed as
+new books. To force reingestion or rebuild after deleting ChromaDB data, use `--full`:
+
+```sh
+pnpm --filter @thenodewalk/api ingest:books --full
+pnpm --filter @thenodewalk/api ingest:books --full "/absolute/path/to/My Books"
+```
+
+The CLI logs progress per book and finishes with processed/skipped book counts, indexed
+chunks, and issues. Unreadable books do not stop later books. PDFs use bookmarks for chapter
+boundaries, or ten-page sections when bookmarks are absent. PDFs without extractable text
+are reported as empty: OCR is not supported. Unsupported file extensions are reported;
+hidden files and symlinks are ignored.
+
+Once indexed, books are available in `/ask`. Retrieval targets three book-section sources
+and two posts, filling missing slots from the other type. Book nodes show a `Book` badge
+with title, section, and PDF page information in their accessible name. Clicking a book node
+opens a dialog with the book title, its section, and a short verbatim excerpt of the retrieved
+passage that best matches your question.
+
+See [RAG Operations and Verification](docs/rag/operations-and-verification.md) for incremental
+ingestion and recovery details.
+
 ### Ask a question
 
 ```sh
@@ -161,7 +219,9 @@ curl -X POST http://localhost:3001/technical-queries \
   -d '{"query":"How does Netflix scale its API?"}'
 ```
 
-The response is `{ summary, graph }`; every graph node links back to its original source URL.
+The response is `{ summary, graph }`. Sourced nodes carry a discriminated `source`: posts
+include their URL and article metadata; books include title, section, and page information.
+Concepts without a source have `source: null`.
 
 ### Local Ollama performance
 

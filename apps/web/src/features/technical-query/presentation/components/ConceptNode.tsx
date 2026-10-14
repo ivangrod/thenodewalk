@@ -14,19 +14,20 @@ export const SourceActivationContext = createContext<
 
 const SOURCE_BADGE_TEXT = { post: 'Post', book: 'Book' } as const;
 
+const SOURCE_ACTION_TEXT = { post: 'View article ↗', book: 'View excerpt' } as const;
+
 /**
- * A knowledge-graph concept rendered as a keyboard-operable button. Post nodes
- * open an accessible dialog with grounded article details before navigating; book
- * nodes are selectable and expose their book and section in the accessible name.
- * The source type and the central node are identified by visible text, never by
- * colour alone.
+ * A knowledge-graph concept rendered as a keyboard-operable button. Sourced nodes
+ * open an accessible dialog: post nodes show grounded article details before
+ * navigating, and book nodes show the book title, section and the passage that
+ * matched the question. The source type and the central node are identified by
+ * visible text, never by colour alone.
  */
 export function ConceptNode({ node }: { node: ConceptGraphNode }): ReactElement {
   const selectedNodeId = useSelectedConceptStore((state) => state.selectedNodeId);
   const select = useSelectedConceptStore((state) => state.select);
   const openSource = useContext(SourceActivationContext);
   const { source } = node;
-  const opensDialog = source?.kind === 'post';
   const initials = node.label
     .split(/\s+/)
     .filter(Boolean)
@@ -60,12 +61,12 @@ export function ConceptNode({ node }: { node: ConceptGraphNode }): ReactElement 
     <button
       type="button"
       aria-label={accessibleNameOf(node)}
-      aria-haspopup={opensDialog ? 'dialog' : undefined}
+      aria-haspopup={source ? 'dialog' : undefined}
       className={`flex w-52 -translate-x-1/2 -translate-y-1/2 items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm shadow-lg transition-colors ${selectedNodeId === node.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-card text-card-foreground hover:bg-secondary'} ${accentClassName}`}
       onFocus={() => select(node.id)}
       onClick={(event) => {
         select(node.id);
-        if (opensDialog) openSource(node, event.currentTarget);
+        if (source) openSource(node, event.currentTarget);
       }}
     >
       <span
@@ -80,9 +81,9 @@ export function ConceptNode({ node }: { node: ConceptGraphNode }): ReactElement 
         {source ? (
           <span className="mt-1 block text-xs font-semibold">{SOURCE_BADGE_TEXT[source.kind]}</span>
         ) : null}
-        {opensDialog ? (
+        {source ? (
           <span aria-hidden="true" className="mt-1 block text-xs opacity-80">
-            View article ↗
+            {SOURCE_ACTION_TEXT[source.kind]}
           </span>
         ) : null}
       </span>
@@ -96,7 +97,7 @@ function accessibleNameOf(node: ConceptGraphNode): string {
   if (source?.kind === 'book') {
     const section = source.sectionTitle ? `, ${source.sectionTitle}` : '';
     const page = source.pageStart === null ? '' : `, page ${source.pageStart}`;
-    return `${node.label}, from the book ${source.bookTitle}${section}${page}${mainIdea}`;
+    return `${node.label}, from the book ${source.bookTitle}${section}${page}${mainIdea}, view book excerpt`;
   }
   return `${node.label}${mainIdea}, ${source?.kind === 'post' ? 'view article details' : 'no linked source'}`;
 }

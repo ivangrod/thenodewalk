@@ -30,7 +30,8 @@ const RESPONSE: TechnicalQueryResponse = {
           kind: 'book',
           bookTitle: 'Engineering Feedback',
           sectionTitle: 'Small loops',
-          pageStart: null,
+          pageStart: 42,
+          excerpt: 'Small feedback loops make engineering changes easier to review.',
         },
       },
     ],
@@ -98,7 +99,7 @@ test.describe('technical query flow', () => {
     await expect(nodeLink).toContainText('Main idea');
     await expect(nodeLink).toContainText('Post');
     const bookNode = page.getByRole('button', {
-      name: 'Feedback loops, from the book Engineering Feedback, Small loops',
+      name: 'Feedback loops, from the book Engineering Feedback, Small loops, page 42, view book excerpt',
     });
     await expect(bookNode).toBeVisible();
     await expect(bookNode).toContainText('Book');
@@ -128,6 +129,34 @@ test.describe('technical query flow', () => {
     await expect(nodeLink).toBeFocused();
   });
 
+  test('opens a book node modal with its title and the excerpt matching the question', async ({
+    page,
+  }) => {
+    await page.goto('/ask');
+    await page
+      .getByRole('searchbox', { name: /ask a technical question/i })
+      .fill('How do feedback loops help code review?');
+    await page.getByRole('button', { name: /search/i }).click();
+
+    const bookNode = page.getByRole('button', { name: /feedback loops, from the book/i });
+    await expect(bookNode).toContainText('View excerpt');
+    await bookNode.focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog', { name: 'Engineering Feedback' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Small loops')).toBeVisible();
+    await expect(dialog.getByText('42')).toBeVisible();
+    await expect(dialog.locator('blockquote')).toHaveText(
+      'Small feedback loops make engineering changes easier to review.',
+    );
+    await expect(dialog.getByRole('link')).toHaveCount(0);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(bookNode).toBeFocused();
+  });
+
   test('renders a concept without a source as a selectable, non-link button', async ({ page }) => {
     await page.goto('/ask');
 
@@ -144,6 +173,35 @@ test.describe('technical query flow', () => {
     await conceptButton.focus();
     await expect(conceptButton).toBeFocused();
     await expect(conceptButton).toHaveClass(/bg-primary/);
+  });
+
+  test('keeps dragged nodes at their released position without moving other nodes', async ({
+    page,
+  }) => {
+    await page.goto('/ask');
+    await page.getByRole('searchbox', { name: /ask a technical question/i }).fill('Question');
+    await page.getByRole('button', { name: /^search$/i }).click();
+    const node = page.getByRole('button', { name: /microservices, no linked source/i });
+    const other = page.getByRole('button', { name: /api gateway, main idea/i });
+    await expect(node).toBeVisible();
+    const initial = await node.boundingBox();
+    const otherInitial = await other.boundingBox();
+    if (!initial || !otherInitial) throw new Error('Missing node bounds');
+    await page.mouse.move(initial.x + initial.width / 2, initial.y + initial.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(initial.x + initial.width / 2 + 60, initial.y + initial.height / 2 + 40, {
+      steps: 10,
+    });
+    await page.mouse.up();
+    await expect.poll(async () => (await node.boundingBox())!.x).toBeGreaterThan(initial.x + 40);
+    const released = await node.boundingBox();
+    await page.waitForTimeout(700); // Let a re-heated force simulation run: the node must remain pinned.
+    const settled = await node.boundingBox();
+    expect(settled!.x).toBeCloseTo(released!.x, 0);
+    expect(settled!.y).toBeCloseTo(released!.y, 0);
+    expect((await other.boundingBox())!.x).toBeCloseTo(otherInitial.x, 0);
+    expect((await other.boundingBox())!.y).toBeCloseTo(otherInitial.y, 0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   test('supports zoom controls and graph replacement on a narrow viewport with reduced motion', async ({
@@ -215,6 +273,18 @@ test.describe('technical query flow', () => {
     const modalResults = await new AxeBuilder({ page }).analyze();
     expect(
       modalResults.violations.filter(
+        (violation) => violation.impact === 'critical' || violation.impact === 'serious',
+      ),
+    ).toEqual([]);
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await page.getByRole('button', { name: /view book excerpt/i }).click();
+    await expect(page.getByRole('dialog', { name: 'Engineering Feedback' })).toBeVisible();
+    await settleTransitions(page);
+    const bookModalResults = await new AxeBuilder({ page }).analyze();
+    expect(
+      bookModalResults.violations.filter(
         (violation) => violation.impact === 'critical' || violation.impact === 'serious',
       ),
     ).toEqual([]);

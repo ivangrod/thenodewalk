@@ -138,6 +138,33 @@ describe('AnswerTechnicalQueryQuery', () => {
       bookTitle: 'Engineering Feedback',
       sectionTitle: 'Feedback',
       pageStart: null,
+      excerpt: 'Book content',
+    });
+  });
+
+  it('adds the passage of the retrieved book chunk that matches the question as excerpt', async () => {
+    const chunk = {
+      ...BookChunkMother.create(),
+      document:
+        'Teams ship in small batches. Feature toggles decouple deployment from release. ' +
+        'Pairing spreads knowledge across the team.',
+    };
+    const { query, generator } = buildQuery([{ chunk, score: 0.9 }]);
+    generator.result = {
+      summary: 'Toggles answer',
+      graph: {
+        nodes: [KnowledgeGraphNodeMother.create({ id: 'book', sourceId: chunk.metadata.sourceId })],
+        edges: [],
+        centralNodeId: 'book',
+      },
+    };
+
+    const response = await query.execute('How do feature toggles help release?');
+
+    expect(response.graph.nodes[0]?.source).toMatchObject({
+      kind: 'book',
+      excerpt:
+        'Feature toggles decouple deployment from release. Pairing spreads knowledge across the team.',
     });
   });
 

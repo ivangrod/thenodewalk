@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, act, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, act, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgeGraph, KnowledgePostSource } from '@thenodewalk/contracts';
@@ -45,6 +45,7 @@ const GRAPH: KnowledgeGraph = {
         bookTitle: 'Engineering Feedback',
         sectionTitle: 'Small loops',
         pageStart: 12,
+        excerpt: 'Small feedback loops make engineering changes easier to review.',
       },
     },
   ],
@@ -91,21 +92,34 @@ describe('KnowledgeGraphCanvas', () => {
     expect(unsourced).not.toHaveTextContent('Book');
   });
 
-  it('renders a book section as a selectable button with its book in the accessible name', () => {
+  it('opens a book modal with the title, section, page and matching excerpt, then restores focus', async () => {
     render(<KnowledgeGraphCanvas graph={GRAPH} />);
     const book = screen.getByRole('button', {
-      name: 'Feedback, from the book Engineering Feedback, Small loops, page 12',
+      name: 'Feedback, from the book Engineering Feedback, Small loops, page 12, view book excerpt',
     });
     expect(book).toHaveTextContent('Book');
-    expect(book).not.toHaveAttribute('aria-haspopup');
+    expect(book).toHaveTextContent('View excerpt');
+    expect(book).toHaveAttribute('aria-haspopup', 'dialog');
     act(() => book.focus());
     expect(useSelectedConceptStore.getState().selectedNodeId).toBe('feedback');
-    fireEvent.click(book);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+
+    fireEvent.click(book);
+
+    const dialog = screen.getByRole('dialog', { name: 'Engineering Feedback' });
+    expect(dialog).toHaveAccessibleDescription('Source for Feedback');
+    expect(within(dialog).getByText('Small loops')).toBeInTheDocument();
+    expect(within(dialog).getByText('12')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Small feedback loops make engineering changes easier to review.'),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link')).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close book details' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(book).toHaveFocus());
   });
 
-  it('omits an unknown section and page from the book accessible name', () => {
+  it('omits unknown book details from the name and shows explicit placeholders in the modal', () => {
     render(
       <KnowledgeGraphCanvas
         graph={{
@@ -118,6 +132,7 @@ describe('KnowledgeGraphCanvas', () => {
                 bookTitle: 'Engineering Feedback',
                 sectionTitle: null,
                 pageStart: null,
+                excerpt: null,
               },
             },
           ],
@@ -125,9 +140,15 @@ describe('KnowledgeGraphCanvas', () => {
         }}
       />,
     );
-    expect(
-      screen.getByRole('button', { name: 'Feedback, from the book Engineering Feedback' }),
-    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Feedback, from the book Engineering Feedback, view book excerpt',
+      }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Engineering Feedback' });
+    expect(within(dialog).getByText('Section unavailable')).toBeInTheDocument();
+    expect(within(dialog).getByText('Excerpt unavailable')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Section starts on page')).not.toBeInTheDocument();
   });
 
   it('keeps unsourced concepts selectable without opening a modal', () => {

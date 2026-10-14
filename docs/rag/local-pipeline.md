@@ -97,7 +97,7 @@ fully local:
 The public `POST /technical-queries` response is always `{ summary, graph }`. A graph node
 contains a discriminated `source`:
 `{ kind: 'post'; url; articleTitle: string | null; blogName: string | null; publishedAt: string | null }`,
-`{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null }`,
+`{ kind: 'book'; bookTitle: string; sectionTitle: string | null; pageStart: number | null; excerpt: string | null }`,
 or `null` when it has no source. This replaces the former public `sourceUrl` field;
 API and web must be deployed together. The domain carries `sourceId: string | null`, and the
 query resolves it against retrieved chunk metadata before returning the contract. The Ollama
@@ -112,6 +112,16 @@ several chunks. For posts, blank fields and invalid dates become `null`; for boo
 section title becomes `null` and the local file path is never exposed. The LLM never
 generates this provenance, and the projection performs no writes or additional network
 requests. The web opens post details in an accessible modal before navigating to the article.
+
+A book source also carries `excerpt`: the short passage of its retrieved chunk that best
+matches the question, selected by the pure domain function `selectExcerpt`. The chunk was
+already retrieved by semantic similarity; the excerpt only narrows it lexically. It picks the
+sentence sharing most distinct question terms (case-, accent- and stopword-insensitive, with
+light stemming such as `tests` ~ `testing`), then appends following sentences while it fits
+`SOURCE_EXCERPT_MAX_LENGTH` (320 characters). An overlong sentence is cut at word boundaries
+around its first matching word with ellipses. Without shared terms, for example a question in
+another language than the book, the opening of the chunk is used. A blank chunk yields `null`.
+The excerpt is verbatim indexed text, never generated, and the web shows it in the book modal.
 
 ### Post chunk metadata migration
 
@@ -530,6 +540,7 @@ export class RssArticleFeedReader {
 - Read-only RAG Query: `apps/api/src/knowledge/application/answer-technical-query.query.ts`
 - Deterministic chunks and repository port: `apps/api/src/knowledge/domain/knowledge-chunk.ts` and `apps/api/src/knowledge/domain/knowledge-chunk-repository.ts`
 - Unique, grounded node sources: `assignUniqueSources` in `apps/api/src/knowledge/domain/knowledge-graph.ts`
+- Book excerpt selection: `selectExcerpt` in `apps/api/src/knowledge/domain/source-excerpt.ts`
 - Central node and 3-level depth limit: `resolveCentralNodeId` and `limitGraphDepth` in `apps/api/src/knowledge/domain/knowledge-graph-focus.ts`
 - Structured Ollama adapter and JSON validation: `apps/api/src/knowledge/infrastructure/ollama/ollama-structured-graph-generator.ts`
 - Port bindings and explicit reader factories: `apps/api/src/knowledge/infrastructure/knowledge.module.ts`

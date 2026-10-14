@@ -81,6 +81,7 @@ describe('book ingestion to query (integration)', () => {
         bookTitle: 'Sample Engineering Book',
         sectionTitle: 'Small feedback loops',
         pageStart: 1,
+        excerpt: 'Small feedback loops make changes easier to review.',
       });
     } finally {
       await context.close();

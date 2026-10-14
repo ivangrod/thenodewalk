@@ -25,6 +25,11 @@ export interface KnowledgeBookSource {
   bookTitle: string;
   sectionTitle: string | null;
   pageStart: number | null;
+  /**
+   * Short passage of the retrieved section that best matches the question. It is
+   * taken verbatim from the indexed text, never generated; `null` when unavailable.
+   */
+  excerpt: string | null;
 }
 
 export type KnowledgeNodeSource = KnowledgePostSource | KnowledgeBookSource;

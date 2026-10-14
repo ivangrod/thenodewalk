@@ -9,7 +9,7 @@ import type {
 import type { EmbeddingGenerator } from '../domain/embedding-generator';
 import { selectBalancedMatches } from '../domain/balanced-matches';
 import { attachMissingSources } from '../domain/attach-missing-sources';
-import type { KnowledgeChunkMetadata } from '../domain/knowledge-chunk';
+import type { KnowledgeChunk } from '../domain/knowledge-chunk';
 import type {
   KnowledgeChunkRepository,
   KnowledgeSearchMatch,
@@ -24,6 +24,7 @@ import {
   MAX_GRAPH_DEPTH,
   resolveCentralNodeId,
 } from '../domain/knowledge-graph-focus';
+import { selectExcerpt } from '../domain/source-excerpt';
 import type { StructuredGraphGenerator } from '../domain/structured-graph-generator';
 import {
   EMBEDDING_GENERATOR,
@@ -83,7 +84,7 @@ export class AnswerTechnicalQueryQuery {
 
     try {
       const generated = await this.graphGenerator.generate(query, matches);
-      const sources = this.sourcesOf(matches);
+      const sources = this.sourcesOf(matches, query);
       const sourced = assignUniqueSources(generated.graph, new Set(sources.keys()));
       const centred: KnowledgeGraphModel = {
         ...sourced,
@@ -114,24 +115,32 @@ export class AnswerTechnicalQueryQuery {
    * Projects the retrieved matches into contract sources keyed by `sourceId`. The
    * first (highest-ranked) match wins when a source has several chunks.
    */
-  private sourcesOf(matches: KnowledgeSearchMatch[]): Map<string, KnowledgeNodeSource> {
+  private sourcesOf(
+    matches: KnowledgeSearchMatch[],
+    query: string,
+  ): Map<string, KnowledgeNodeSource> {
     const sources = new Map<string, KnowledgeNodeSource>();
     for (const { chunk } of matches) {
       if (!sources.has(chunk.metadata.sourceId)) {
-        sources.set(chunk.metadata.sourceId, this.sourceFor(chunk.metadata));
+        sources.set(chunk.metadata.sourceId, this.sourceFor(chunk, query));
       }
     }
     return sources;
   }
 
-  /** Blank fields and invalid publication dates become `null`. */
-  private sourceFor(metadata: KnowledgeChunkMetadata): KnowledgeNodeSource {
+  /**
+   * Blank fields and invalid publication dates become `null`. A book excerpt is
+   * the passage of the retrieved chunk that best matches the question.
+   */
+  private sourceFor(chunk: KnowledgeChunk, query: string): KnowledgeNodeSource {
+    const { metadata } = chunk;
     if (metadata.sourceType === 'book') {
       return {
         kind: 'book',
         bookTitle: metadata.bookTitle,
         sectionTitle: metadata.sectionTitle.trim() || null,
         pageStart: metadata.pageStart ?? null,
+        excerpt: selectExcerpt(chunk.document, query),
       };
     }
     const timestamp = metadata.publishedAt.trim() === '' ? NaN : Date.parse(metadata.publishedAt);
